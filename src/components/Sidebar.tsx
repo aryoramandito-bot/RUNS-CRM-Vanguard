@@ -8,7 +8,8 @@ import {
   TrendingUp,
   Database,
   Sun,
-  Moon
+  Moon,
+  ClipboardList
 } from 'lucide-react';
 import { useCRM } from '../context/CRMContext';
 
@@ -25,6 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, theme
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'funnel', label: 'Sales Funnel', icon: TrendingUp },
+    { id: 'quick-log', label: 'Write Log', icon: ClipboardList },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'projects', label: 'Projects', icon: Briefcase },
     { id: 'contracts', label: 'Contracts', icon: FileSignature },

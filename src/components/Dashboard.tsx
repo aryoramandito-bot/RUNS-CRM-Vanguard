@@ -149,7 +149,7 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
       </div>
 
       {/* Grid: 5 Metric Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
+      <div className="dashboard-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
         
         {/* Metric 0: Sales Pipeline */}
         <div className="glass-panel glass-panel-hover" style={{ padding: '1.5rem' }}>
@@ -241,7 +241,7 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
       </div>
 
       {/* Main Grid: Charts & Analytics / Action list */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr', gap: '1.5rem' }}>
+      <div className="dashboard-main-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr', gap: '1.5rem' }}>
         
         {/* Left Section: Progress & Pipelines */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>

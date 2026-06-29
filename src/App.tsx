@@ -10,6 +10,7 @@ import { WorkflowConfig } from './components/WorkflowConfig';
 import { FlowMonitor } from './components/FlowMonitor';
 import { CollectionMonitor } from './components/CollectionMonitor';
 import { DatabaseSync } from './components/DatabaseSync';
+import { QuickMeetingLog } from './components/QuickMeetingLog';
 import { Menu } from 'lucide-react';
 
 function CRMAppContent() {
@@ -68,6 +69,8 @@ function CRMAppContent() {
         return <CollectionMonitor onManageWorkflow={handleManageWorkflow} />;
       case 'sync':
         return <DatabaseSync />;
+      case 'quick-log':
+        return <QuickMeetingLog onLogSaved={() => setActiveTab('funnel')} />;
       default:
         return <Dashboard onViewContract={handleManageWorkflow} />;
     }
