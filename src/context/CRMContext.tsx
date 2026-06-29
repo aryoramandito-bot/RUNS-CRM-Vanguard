@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type {
   ClientCompany,
   ClientContact,
@@ -24,6 +24,8 @@ interface CRMContextType {
   sheetUrl: string;
   setSheetUrl: (url: string) => void;
   isSyncing: boolean;
+  autoSync: boolean;
+  setAutoSync: (val: boolean) => void;
   syncFromSheets: () => Promise<{ success: boolean; message: string }>;
   syncToSheets: (targetUrl?: string) => Promise<{ success: boolean; message: string }>;
 
@@ -693,6 +695,16 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return localStorage.getItem('vanguard_sheets_url') || 'https://script.google.com/macros/s/AKfycby0n9ubHy9zkLk47U4dzyzGrCE9hueKKWfgWGU04CWWuN-pPD7dwaHEJoISBgwzPdu38Q/exec';
   });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [autoSync, setAutoSyncState] = useState<boolean>(() => {
+    return localStorage.getItem('vanguard_auto_sync') !== 'false';
+  });
+  
+  const setAutoSync = (val: boolean) => {
+    setAutoSyncState(val);
+    localStorage.setItem('vanguard_auto_sync', val ? 'true' : 'false');
+  };
+
+  const skipAutoPushRef = useRef(false);
 
   const setSheetUrl = (url: string) => {
     setSheetUrlState(url);
@@ -761,6 +773,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const cleanData = cleanDatesInObject(data);
       
       // Update local states
+      skipAutoPushRef.current = true;
       if (cleanData.companies) setCompanies(cleanData.companies);
       if (cleanData.contacts) setContacts(cleanData.contacts);
       if (cleanData.projects) setProjects(cleanData.projects);
@@ -770,6 +783,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (cleanData.meetings) setMeetings(cleanData.meetings);
       
       setIsSyncing(false);
+      setTimeout(() => {
+        skipAutoPushRef.current = false;
+      }, 2000);
+
       return { success: true, message: 'Successfully pulled database state from Google Sheets!' };
     } catch (error: any) {
       setIsSyncing(false);
@@ -827,6 +844,22 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: `Failed to push to Google Sheets: ${error.message}` };
     }
   };
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!autoSync || !sheetUrl || skipAutoPushRef.current) return;
+
+    const timer = setTimeout(async () => {
+      console.log('Debounced auto-saving changes to Google Sheets...');
+      try {
+        await syncToSheets();
+      } catch (e) {
+        console.error('Auto-sync push failed:', e);
+      }
+    }, 4000); // 4 seconds delay of inactivity
+
+    return () => clearTimeout(timer);
+  }, [companies, contacts, projects, contracts, templates, deals, meetings, autoSync, sheetUrl]);
 
   // --- Company Operations ---
   const addCompany = (companyData: Omit<ClientCompany, 'id' | 'dateAdded'>) => {
@@ -1103,6 +1136,8 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sheetUrl,
         setSheetUrl,
         isSyncing,
+        autoSync,
+        setAutoSync,
         syncFromSheets,
         syncToSheets,
         addCompany,

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const DatabaseSync: React.FC = () => {
-  const { sheetUrl, setSheetUrl, isSyncing, syncFromSheets, syncToSheets } = useCRM();
+  const { sheetUrl, setSheetUrl, isSyncing, autoSync, setAutoSync, syncFromSheets, syncToSheets } = useCRM();
   
   const [urlInput, setUrlInput] = useState(sheetUrl);
   const [copiedScript, setCopiedScript] = useState(false);
@@ -343,6 +343,49 @@ function doPost(e) {
                 </button>
               </div>
             </form>
+
+            <div style={{ 
+              marginTop: '1.25rem', 
+              paddingTop: '1.25rem', 
+              borderTop: '1px solid var(--border-glass)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, display: 'block' }}>Real-time Auto-Sync</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Automatically save changes to Google Sheets in the background.</span>
+              </div>
+              <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '46px', height: '24px' }}>
+                <input
+                  type="checkbox"
+                  checked={autoSync}
+                  onChange={e => setAutoSync(e.target.checked)}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: autoSync ? 'var(--accent-indigo)' : 'rgba(255,255,255,0.08)',
+                  transition: '0.3s',
+                  borderRadius: '24px',
+                  border: '1px solid var(--border-glass)'
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    content: '""',
+                    height: '16px', width: '16px',
+                    left: autoSync ? '25px' : '4px',
+                    bottom: '3px',
+                    backgroundColor: 'white',
+                    transition: '0.3s',
+                    borderRadius: '50%',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                  }} />
+                </span>
+              </label>
+            </div>
 
             {/* Sync Results Feedback */}
             {syncResult.type && (
