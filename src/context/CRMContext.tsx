@@ -555,6 +555,30 @@ const seedMeetings: MeetingLog[] = [
   }
 ];
 
+const cleanDatesInObject = <T,>(obj: T): T => {
+  if (!obj || typeof obj !== 'object') return obj;
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanDatesInObject(item)) as unknown as T;
+  }
+  
+  const copy = { ...obj } as any;
+  for (const key in copy) {
+    if (Object.prototype.hasOwnProperty.call(copy, key)) {
+      const val = copy[key];
+      if (typeof val === 'string') {
+        // Matches ISO dates like "2026-02-26T17:00:00.000Z" or "2026-02-26T17:00:00"
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
+          copy[key] = val.split('T')[0];
+        }
+      } else if (val && typeof val === 'object') {
+        copy[key] = cleanDatesInObject(val);
+      }
+    }
+  }
+  return copy;
+};
+
 export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [companies, setCompanies] = useState<ClientCompany[]>(() => {
     const saved = localStorage.getItem('vanguard_companies');
@@ -563,7 +587,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const oldCustomers = localStorage.getItem('vanguard_customers');
       if (oldCustomers) {
         try {
-          const parsed = JSON.parse(oldCustomers);
+          const parsed = cleanDatesInObject(JSON.parse(oldCustomers));
           // Map old Customer data into ClientCompany structure
           const migrated: ClientCompany[] = parsed.map((cust: any) => ({
             id: `comp-${generateId()}`, // Give it a company ID
@@ -575,11 +599,11 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             status: cust.status || 'Active',
             dateAdded: cust.dateAdded || new Date().toISOString().split('T')[0]
           }));
-          return migrated;
+          return cleanDatesInObject(migrated);
         } catch(e) {}
       }
     }
-    return saved ? JSON.parse(saved) : seedCompanies;
+    return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedCompanies);
   });
 
   const [contacts, setContacts] = useState<ClientContact[]>(() => {
@@ -589,7 +613,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const oldCustomers = localStorage.getItem('vanguard_customers');
       if (oldCustomers && companies.length > 0) {
         try {
-          const parsed = JSON.parse(oldCustomers);
+          const parsed = cleanDatesInObject(JSON.parse(oldCustomers));
           const migrated: ClientContact[] = parsed.map((cust: any) => {
             const comp = companies.find(c => c.name === cust.company);
             return {
@@ -603,18 +627,18 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               dateAdded: cust.dateAdded || new Date().toISOString().split('T')[0]
             };
           });
-          return migrated;
+          return cleanDatesInObject(migrated);
         } catch(e) {}
       }
     }
-    return saved ? JSON.parse(saved) : seedContacts;
+    return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedContacts);
   });
 
   const [projects, setProjects] = useState<Project[]>(() => {
     const saved = localStorage.getItem('vanguard_projects');
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
+        const parsed = cleanDatesInObject(JSON.parse(saved));
         // Rename customerId to companyId if present in storage project entries
         return parsed.map((p: any) => {
           if (p.customerId && !p.companyId) {
@@ -624,27 +648,27 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       } catch(e) {}
     }
-    return saved ? JSON.parse(saved) : seedProjects;
+    return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedProjects);
   });
 
   const [contracts, setContracts] = useState<Contract[]>(() => {
     const saved = localStorage.getItem('vanguard_contracts');
-    return saved ? JSON.parse(saved) : seedContracts;
+    return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedContracts);
   });
 
   const [templates, setTemplates] = useState<WorkflowTemplate[]>(() => {
     const saved = localStorage.getItem('vanguard_templates');
-    return saved ? JSON.parse(saved) : defaultTemplates;
+    return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(defaultTemplates);
   });
 
   const [deals, setDeals] = useState<SalesDeal[]>(() => {
     const saved = localStorage.getItem('vanguard_deals');
-    return saved ? JSON.parse(saved) : seedDeals;
+    return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedDeals);
   });
 
   const [meetings, setMeetings] = useState<MeetingLog[]>(() => {
     const saved = localStorage.getItem('vanguard_meetings');
-    return saved ? JSON.parse(saved) : seedMeetings;
+    return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedMeetings);
   });
 
   const [stageProbabilities, setStageProbabilities] = useState<Record<SalesDealStage, number>>(() => {
@@ -707,30 +731,6 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('vanguard_stage_probs', JSON.stringify(stageProbabilities));
   }, [stageProbabilities]);
-
-  const cleanDatesInObject = <T,>(obj: T): T => {
-    if (!obj || typeof obj !== 'object') return obj;
-    
-    if (Array.isArray(obj)) {
-      return obj.map(item => cleanDatesInObject(item)) as unknown as T;
-    }
-    
-    const copy = { ...obj } as any;
-    for (const key in copy) {
-      if (Object.prototype.hasOwnProperty.call(copy, key)) {
-        const val = copy[key];
-        if (typeof val === 'string') {
-          // Matches ISO dates like "2026-02-26T17:00:00.000Z" or "2026-02-26T17:00:00"
-          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
-            copy[key] = val.split('T')[0];
-          }
-        } else if (val && typeof val === 'object') {
-          copy[key] = cleanDatesInObject(val);
-        }
-      }
-    }
-    return copy;
-  };
 
   // Sync pull from Google Sheets
   const syncFromSheets = async (): Promise<{ success: boolean; message: string }> => {
