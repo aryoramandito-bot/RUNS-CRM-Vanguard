@@ -616,6 +616,68 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Layout grids moved from inline styles for responsiveness */
+.dashboard-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr;
+  gap: 1.5rem;
+}
+
+.collection-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.progress-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.quick-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  border-top: 1px solid var(--border-glass);
+  padding-top: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.alert-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: rgba(255,255,255,0.01);
+  transition: all var(--transition-fast);
+}
+
+.alert-item-card.overdue {
+  background: rgba(244, 63, 94, 0.03);
+}
+
+.alert-item-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.alert-item-right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
 /* Mobile Responsive Styling overrides */
 .mobile-header {
   display: none;
@@ -773,6 +835,60 @@ h1, h2, h3, h4, h5, h6 {
     border-color: var(--accent-indigo);
     color: white;
     box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+  }
+
+  /* Mobile overrides for layout classes */
+  .dashboard-summary-grid,
+  .collection-summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard-main-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .progress-label-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.25rem !important;
+  }
+
+  .quick-stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+    text-align: left !important;
+  }
+
+  .quick-stats-grid > div {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    text-align: left !important;
+  }
+
+  .quick-stats-grid > div > div:first-child {
+    margin-bottom: 0 !important;
+  }
+
+  .alert-item-card {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 1.25rem !important;
+    padding: 1.25rem !important;
+  }
+
+  .alert-item-left {
+    align-items: flex-start !important;
+    width: 100% !important;
+  }
+
+  .alert-item-right {
+    width: 100% !important;
+    justify-content: space-between !important;
+    border-top: 1px solid var(--border-glass) !important;
+    padding-top: 0.75rem !important;
+    align-items: center !important;
+    gap: 1rem !important;
   }
 }
 

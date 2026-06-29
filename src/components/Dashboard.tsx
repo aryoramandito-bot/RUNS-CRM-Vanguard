@@ -149,7 +149,7 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
       </div>
 
       {/* Grid: 5 Metric Cards */}
-      <div className="dashboard-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
+      <div className="dashboard-summary-grid">
         
         {/* Metric 0: Sales Pipeline */}
         <div className="glass-panel glass-panel-hover" style={{ padding: '1.5rem' }}>
@@ -241,7 +241,7 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
       </div>
 
       {/* Main Grid: Charts & Analytics / Action list */}
-      <div className="dashboard-main-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr', gap: '1.5rem' }}>
+      <div className="dashboard-main-grid">
         
         {/* Left Section: Progress & Pipelines */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
@@ -251,7 +251,7 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
             
             {/* IDR Pipeline */}
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+              <div className="progress-label-row">
                 <span style={{ fontWeight: 600 }}>IDR Currency Collection ({progressIDR}% Met)</span>
                 <span style={{ color: 'var(--text-secondary)' }}>
                   {formatCurrency(collectedIDR, 'IDR')} / {formatCurrency(totalValueIDR, 'IDR')}
@@ -272,7 +272,7 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
 
             {/* USD Pipeline */}
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+              <div className="progress-label-row">
                 <span style={{ fontWeight: 600 }}>USD Currency Collection ({progressUSD}% Met)</span>
                 <span style={{ color: 'var(--text-secondary)' }}>
                   {formatCurrency(collectedUSD, 'USD')} / {formatCurrency(totalValueUSD, 'USD')}
@@ -292,7 +292,7 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
             </div>
             
             {/* Quick Stats Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', borderTop: '1px solid var(--border-glass)', paddingTop: '1.5rem', marginTop: '0.5rem' }}>
+            <div className="quick-stats-grid">
               <div style={{ textAlign: 'center' }}>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '0.2rem' }}>Client Base</div>
                 <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>
@@ -393,18 +393,13 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
             {criticalMilestones.slice(0, 5).map((milestone, idx) => (
               <div 
                 key={idx} 
-                className="glass-panel"
+                className={`glass-panel alert-item-card ${milestone.isOverdue ? 'overdue' : ''}`}
                 style={{ 
                   padding: '1rem 1.25rem', 
-                  background: milestone.isOverdue ? 'rgba(244, 63, 94, 0.03)' : 'rgba(255,255,255,0.01)',
                   borderColor: milestone.isOverdue ? 'rgba(244, 63, 94, 0.15)' : 'var(--border-glass)',
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between',
-                  gap: '1rem'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div className="alert-item-left" style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
                   <div 
                     style={{ 
                       padding: '0.5rem', 
@@ -428,7 +423,7 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
                   </div>
                 </div>
                 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                <div className="alert-item-right">
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Due Date</div>
                     <div style={{ fontSize: '0.85rem', fontWeight: 600, color: milestone.isOverdue ? 'var(--error)' : 'var(--text-primary)' }}>

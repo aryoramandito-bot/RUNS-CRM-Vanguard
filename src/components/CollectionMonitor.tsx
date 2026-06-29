@@ -224,7 +224,7 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
       </div>
 
       {/* Financial Aggregates Bar - Summary Cards for each Kanban column */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
+      <div className="collection-summary-grid">
         
         {/* Planned & Scheduled Total */}
         <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
