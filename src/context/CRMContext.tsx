@@ -690,7 +690,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Google Sheet Integration state
   const [sheetUrl, setSheetUrlState] = useState<string>(() => {
-    return localStorage.getItem('vanguard_sheets_url') || '';
+    return localStorage.getItem('vanguard_sheets_url') || 'https://script.google.com/macros/s/AKfycby0n9ubHy9zkLk47U4dzyzGrCE9hueKKWfgWGU04CWWuN-pPD7dwaHEJoISBgwzPdu38Q/exec';
   });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
