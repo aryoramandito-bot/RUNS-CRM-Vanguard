@@ -708,6 +708,30 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('vanguard_stage_probs', JSON.stringify(stageProbabilities));
   }, [stageProbabilities]);
 
+  const cleanDatesInObject = <T,>(obj: T): T => {
+    if (!obj || typeof obj !== 'object') return obj;
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => cleanDatesInObject(item)) as unknown as T;
+    }
+    
+    const copy = { ...obj } as any;
+    for (const key in copy) {
+      if (Object.prototype.hasOwnProperty.call(copy, key)) {
+        const val = copy[key];
+        if (typeof val === 'string') {
+          // Matches ISO dates like "2026-02-26T17:00:00.000Z" or "2026-02-26T17:00:00"
+          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
+            copy[key] = val.split('T')[0];
+          }
+        } else if (val && typeof val === 'object') {
+          copy[key] = cleanDatesInObject(val);
+        }
+      }
+    }
+    return copy;
+  };
+
   // Sync pull from Google Sheets
   const syncFromSheets = async (): Promise<{ success: boolean; message: string }> => {
     if (!sheetUrl) return { success: false, message: 'Google Sheets Apps Script URL is not configured.' };
@@ -724,15 +748,16 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       const data = await response.json();
+      const cleanData = cleanDatesInObject(data);
       
       // Update local states
-      if (data.companies) setCompanies(data.companies);
-      if (data.contacts) setContacts(data.contacts);
-      if (data.projects) setProjects(data.projects);
-      if (data.contracts) setContracts(data.contracts);
-      if (data.templates) setTemplates(data.templates);
-      if (data.deals) setDeals(data.deals);
-      if (data.meetings) setMeetings(data.meetings);
+      if (cleanData.companies) setCompanies(cleanData.companies);
+      if (cleanData.contacts) setContacts(cleanData.contacts);
+      if (cleanData.projects) setProjects(cleanData.projects);
+      if (cleanData.contracts) setContracts(cleanData.contracts);
+      if (cleanData.templates) setTemplates(cleanData.templates);
+      if (cleanData.deals) setDeals(cleanData.deals);
+      if (cleanData.meetings) setMeetings(cleanData.meetings);
       
       setIsSyncing(false);
       return { success: true, message: 'Successfully pulled database state from Google Sheets!' };
