@@ -127,9 +127,11 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
   const activePercent = totalProjects > 0 ? Math.round((activeProjects / totalProjects) * 100) : 0;
   const planningPercent = totalProjects > 0 ? Math.round((planningProjects / totalProjects) * 100) : 0;
 
-  // IDR / USD progress bars
-  const progressIDR = totalValueIDR > 0 ? Math.round((collectedIDR / totalValueIDR) * 100) : 0;
-  const progressUSD = totalValueUSD > 0 ? Math.round((collectedUSD / totalValueUSD) * 100) : 0;
+  // IDR / USD progress bars based on cash collected vs total targets (collected + outstanding)
+  const targetIDR = collectedIDR + outstandingIDR;
+  const targetUSD = collectedUSD + outstandingUSD;
+  const progressIDR = targetIDR > 0 ? Math.round((collectedIDR / targetIDR) * 100) : 0;
+  const progressUSD = targetUSD > 0 ? Math.round((collectedUSD / targetUSD) * 100) : 0;
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -254,7 +256,7 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
               <div className="progress-label-row">
                 <span style={{ fontWeight: 600 }}>IDR Currency Collection ({progressIDR}% Met)</span>
                 <span style={{ color: 'var(--text-secondary)' }}>
-                  {formatCurrency(collectedIDR, 'IDR')} / {formatCurrency(totalValueIDR, 'IDR')}
+                  {formatCurrency(collectedIDR, 'IDR')} / {formatCurrency(targetIDR, 'IDR')}
                 </span>
               </div>
               <div style={{ width: '100%', height: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
@@ -275,7 +277,7 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
               <div className="progress-label-row">
                 <span style={{ fontWeight: 600 }}>USD Currency Collection ({progressUSD}% Met)</span>
                 <span style={{ color: 'var(--text-secondary)' }}>
-                  {formatCurrency(collectedUSD, 'USD')} / {formatCurrency(totalValueUSD, 'USD')}
+                  {formatCurrency(collectedUSD, 'USD')} / {formatCurrency(targetUSD, 'USD')}
                 </span>
               </div>
               <div style={{ width: '100%', height: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
