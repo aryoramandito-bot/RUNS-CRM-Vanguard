@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import type { Currency, ContractStageCategory, ContractStageStatus } from '../types/crm';
 import { 
-  DollarSign, 
   Calendar, 
   AlertCircle, 
   CheckCircle2, 

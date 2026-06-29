@@ -54,7 +54,7 @@ export interface ContractStage {
   dueDate: string;
   completedDate: string | null;
   invoiceNumber: string | null; // For Billing/Collection
-  invoiceDate: string | null;   // For Billing/Collection
+  invoiceDate?: string | null;   // For Billing/Collection
   billingAmount: number | null; // For Billing/Collection
   paymentReference: string | null; // For Collection
   notes: string;
