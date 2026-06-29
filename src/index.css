@@ -860,7 +860,7 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 0.75rem;
     font-weight: 700;
     text-align: center;
-    border-radius: 20px;
+    border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--border-glass);
     color: var(--text-secondary);
@@ -870,10 +870,10 @@ h1, h2, h3, h4, h5, h6 {
   }
   
   .mobile-stage-tab-btn.active {
-    background: var(--accent-indigo);
-    border-color: var(--accent-indigo);
-    color: white;
-    box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+    background: var(--accent-gradient) !important;
+    border-color: transparent !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35) !important;
   }
 
   /* Mobile overrides for layout classes */
