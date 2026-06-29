@@ -7,8 +7,8 @@ import type {
   ContractStage,
   WorkflowTemplate,
   SalesDeal,
+  SalesDealStage,
   MeetingLog,
-  QuotationItem,
 } from '../types/crm';
 
 interface CRMContextType {

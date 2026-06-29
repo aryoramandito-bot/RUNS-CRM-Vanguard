@@ -2,13 +2,10 @@ import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { 
   TrendingUp, 
-  TrendingDown, 
   DollarSign, 
   Sliders, 
   AlertTriangle, 
   Award,
-  Building,
-  Calendar,
   Layers,
   Percent
 } from 'lucide-react';

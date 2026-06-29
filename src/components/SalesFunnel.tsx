@@ -1,24 +1,19 @@
 import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { SalesDashboard } from './SalesDashboard';
-import type { SalesDeal, SalesDealStage, MeetingLog, QuotationItem, Currency } from '../types/crm';
+import type { SalesDeal, SalesDealStage, QuotationItem, Currency } from '../types/crm';
 import { 
   Plus, 
   Search, 
-  Edit2, 
   Trash2, 
   X, 
   Building, 
   User, 
   Calendar, 
-  DollarSign, 
   FolderPlus, 
   Clock, 
   FileText, 
-  Printer, 
-  TrendingUp, 
-  Info,
-  ChevronRight
+  Printer
 } from 'lucide-react';
 
 interface SalesFunnelProps {
@@ -323,7 +318,6 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
 
   // Filter deals
   const filteredDeals = deals.filter(d => {
-    const comp = companies.find(c => c.id === d.companyId);
     const matchesSearch = d.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           d.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCompany = companyFilter === 'All' || d.companyId === companyFilter;
