@@ -12,7 +12,8 @@ import {
   Info,
   Clock,
   Sparkles,
-  ChevronLeft
+  ChevronLeft,
+  Calendar
 } from 'lucide-react';
 
 interface FlowMonitorProps {
@@ -36,8 +37,20 @@ export const FlowMonitor: React.FC<FlowMonitorProps> = ({ selectedContractId, on
   const [stageStatus, setStageStatus] = useState<ContractStageStatus>('Pending');
   const [stageDueDate, setStageDueDate] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [invoiceDate, setInvoiceDate] = useState('');
   const [billingAmount, setBillingAmount] = useState<number>(0);
   const [paymentReference, setPaymentReference] = useState('');
+
+  const formatDateDDMMMYY = (dateStr: string | null) => {
+    if (!dateStr || dateStr === '-') return '-';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[d.getMonth()];
+    const year = String(d.getFullYear()).slice(-2);
+    return `${day}-${month}-${year}`;
+  };
 
   // Form States for Adding Custom Stage
   const [isAddingCustom, setIsAddingCustom] = useState(false);
@@ -54,6 +67,7 @@ export const FlowMonitor: React.FC<FlowMonitorProps> = ({ selectedContractId, on
     setStageStatus(stage.status);
     setStageDueDate(stage.dueDate);
     setInvoiceNumber(stage.invoiceNumber || '');
+    setInvoiceDate(stage.invoiceDate || '');
     setBillingAmount(stage.billingAmount || 0);
     setPaymentReference(stage.paymentReference || '');
   };
@@ -67,6 +81,7 @@ export const FlowMonitor: React.FC<FlowMonitorProps> = ({ selectedContractId, on
       status: stageStatus,
       dueDate: stageDueDate,
       invoiceNumber: invoiceNumber || null,
+      invoiceDate: invoiceDate || null,
       billingAmount: billingAmount || null,
       paymentReference: paymentReference || null,
     });
@@ -89,6 +104,7 @@ export const FlowMonitor: React.FC<FlowMonitorProps> = ({ selectedContractId, on
         dueDate: customDueDate,
         completedDate: null,
         invoiceNumber: null,
+        invoiceDate: null,
         billingAmount: customCategory === 'Billing' || customCategory === 'Collection' ? 0 : null,
         paymentReference: null,
         notes: '',
@@ -334,12 +350,18 @@ export const FlowMonitor: React.FC<FlowMonitorProps> = ({ selectedContractId, on
                     </div>
 
                     {/* Invoicing info pill in Card */}
-                    {(stage.invoiceNumber || (stage.billingAmount && stage.billingAmount > 0)) && (
-                      <div style={{ marginTop: '0.6rem', padding: '0.35rem 0.6rem', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: '1rem', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                    {(stage.invoiceNumber || stage.invoiceDate || (stage.billingAmount && stage.billingAmount > 0)) && (
+                      <div style={{ marginTop: '0.6rem', padding: '0.35rem 0.6rem', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexWrap: 'wrap', gap: '1rem', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
                         {stage.invoiceNumber && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                             <FileText size={11} className="gradient-text" />
                             <span>Inv: <strong>{stage.invoiceNumber}</strong></span>
+                          </div>
+                        )}
+                        {stage.invoiceDate && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <Calendar size={11} className="gradient-text" />
+                            <span>Inv Date: <strong>{formatDateDDMMMYY(stage.invoiceDate)}</strong></span>
                           </div>
                         )}
                         {stage.billingAmount && stage.billingAmount > 0 && (
@@ -423,6 +445,17 @@ export const FlowMonitor: React.FC<FlowMonitorProps> = ({ selectedContractId, on
                         placeholder="e.g. INV/2026/042"
                         value={invoiceNumber}
                         onChange={e => setInvoiceNumber(e.target.value)}
+                        className="form-input"
+                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Invoice Date</label>
+                      <input
+                        type="date"
+                        value={invoiceDate}
+                        onChange={e => setInvoiceDate(e.target.value)}
                         className="form-input"
                         style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }}
                       />

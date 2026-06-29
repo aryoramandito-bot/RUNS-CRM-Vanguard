@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import type { Currency, ContractStageCategory, ContractStageStatus } from '../types/crm';
 import { 
@@ -8,7 +8,8 @@ import {
   CheckCircle2, 
   FileText, 
   Building, 
-  UserCheck
+  Clock,
+  Search
 } from 'lucide-react';
 
 interface CollectionMonitorProps {
@@ -34,6 +35,12 @@ interface VisualMilestone {
 export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWorkflow }) => {
   const { contracts, projects, companies } = useCRM();
   const today = new Date().toISOString().split('T')[0];
+
+  // State for Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('All');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [currencyFilter, setCurrencyFilter] = useState('All');
 
   // Helper formatting
   const formatCurrency = (val: number, curr: Currency) => {
@@ -69,13 +76,30 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
           status: st.status,
           dueDate: st.dueDate,
           billingAmount: st.billingAmount || 0,
-          invoiceNumber: st.invoiceNumber,
-          paymentReference: st.paymentReference,
+          invoiceNumber: st.invoiceNumber || null,
+          paymentReference: st.paymentReference || null,
           projectCode: p ? p.code : 'N/A',
           companyName: cust ? cust.name : 'N/A'
         });
       }
     });
+  });
+
+  // Filter milestones based on state
+  const filteredMilestones = milestones.filter(m => {
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = 
+      m.projectCode.toLowerCase().includes(query) ||
+      m.stageName.toLowerCase().includes(query) ||
+      m.companyName.toLowerCase().includes(query) ||
+      (m.invoiceNumber && m.invoiceNumber.toLowerCase().includes(query));
+      
+    const company = companies.find(c => c.name === m.companyName);
+    const matchesCompany = companyFilter === 'All' || (company && company.id === companyFilter);
+    const matchesCategory = categoryFilter === 'All' || m.category === categoryFilter;
+    const matchesCurrency = currencyFilter === 'All' || m.currency === currencyFilter;
+    
+    return matchesSearch && matchesCompany && matchesCategory && matchesCurrency;
   });
 
   // Columns classification logic:
@@ -84,38 +108,41 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
   // 3. INVOICED / AWAITING PAYMENT: Category Collection with status Active (or category Billing done but Collection is pending, but Collection status Active handles this beautifully)
   // 4. SETTLED / COLLECTED: Category Collection with status Done
   
-  const overdueMilestones = milestones.filter(m => m.status !== 'Done' && m.status !== 'Skipped' && m.dueDate < today);
+  const overdueMilestones = filteredMilestones.filter(m => m.status !== 'Done' && m.status !== 'Skipped' && m.dueDate < today);
   
-  const plannedMilestones = milestones.filter(m => 
+  const plannedMilestones = filteredMilestones.filter(m => 
     (m.status === 'Pending') && 
     m.dueDate >= today
   );
 
-  const invoicedMilestones = milestones.filter(m => 
+  const invoicedMilestones = filteredMilestones.filter(m => 
     m.status === 'Active' && 
     m.dueDate >= today
   );
 
-  const settledMilestones = milestones.filter(m => 
+  const settledMilestones = filteredMilestones.filter(m => 
     m.category === 'Collection' && 
     m.status === 'Done'
   );
 
-  // Financial aggregates
-  let totalBilledIDR = 0;
-  let totalBilledUSD = 0;
-  let totalCollectedIDR = 0;
-  let totalCollectedUSD = 0;
+  // Helper to calculate totals for a list of milestones
+  const getTotals = (list: VisualMilestone[]) => {
+    let idr = 0;
+    let usd = 0;
+    list.forEach(m => {
+      if (m.currency === 'IDR') {
+        idr += m.billingAmount;
+      } else {
+        usd += m.billingAmount;
+      }
+    });
+    return { idr, usd };
+  };
 
-  milestones.forEach(m => {
-    if (m.currency === 'IDR') {
-      if (m.category === 'Billing' && m.status === 'Done') totalBilledIDR += m.billingAmount;
-      if (m.category === 'Collection' && m.status === 'Done') totalCollectedIDR += m.billingAmount;
-    } else {
-      if (m.category === 'Billing' && m.status === 'Done') totalBilledUSD += m.billingAmount;
-      if (m.category === 'Collection' && m.status === 'Done') totalCollectedUSD += m.billingAmount;
-    }
-  });
+  const plannedTotals = getTotals(plannedMilestones);
+  const invoicedTotals = getTotals(invoicedMilestones);
+  const overdueTotals = getTotals(overdueMilestones);
+  const settledTotals = getTotals(settledMilestones);
 
   const columnHeaders = [
     { id: 'planned', title: 'Planned & Scheduled', color: 'var(--text-secondary)', count: plannedMilestones.length, list: plannedMilestones },
@@ -135,50 +162,127 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
         </p>
       </div>
 
-      {/* Financial Aggregates Bar */}
+      {/* Filters Bar */}
+      <div className="glass-panel" style={{ padding: '1rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', flexGrow: 1 }}>
+          
+          {/* Search Input */}
+          <div style={{ position: 'relative', width: '240px' }}>
+            <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search code, milestone, company..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="form-input"
+              style={{ paddingLeft: '2.25rem', fontSize: '0.8rem' }}
+            />
+          </div>
+
+          {/* Company Filter */}
+          <select
+            value={companyFilter}
+            onChange={e => setCompanyFilter(e.target.value)}
+            className="form-input"
+            style={{ width: '180px', fontSize: '0.8rem', padding: '0.5rem 0.75rem' }}
+          >
+            <option value="All">All Companies</option>
+            {companies.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          {/* Category Filter */}
+          <select
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value)}
+            className="form-input"
+            style={{ width: '150px', fontSize: '0.8rem', padding: '0.5rem 0.75rem' }}
+          >
+            <option value="All">All Categories</option>
+            <option value="Billing">Billing Only</option>
+            <option value="Collection">Collection Only</option>
+          </select>
+
+          {/* Currency Filter */}
+          <select
+            value={currencyFilter}
+            onChange={e => setCurrencyFilter(e.target.value)}
+            className="form-input"
+            style={{ width: '140px', fontSize: '0.8rem', padding: '0.5rem 0.75rem' }}
+          >
+            <option value="All">All Currencies</option>
+            <option value="IDR">IDR Only</option>
+            <option value="USD">USD Only</option>
+          </select>
+
+        </div>
+      </div>
+
+      {/* Financial Aggregates Bar - Summary Cards for each Kanban column */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
         
-        {/* Total Invoiced IDR */}
+        {/* Planned & Scheduled Total */}
+        <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ padding: '0.5rem', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)' }}>
+            <Clock size={20} />
+          </div>
+          <div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Planned & Scheduled</span>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, marginTop: '0.15rem' }}>
+              {formatCurrency(plannedTotals.idr, 'IDR')}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.05rem' }}>
+              {formatCurrency(plannedTotals.usd, 'USD')}
+            </div>
+          </div>
+        </div>
+
+        {/* Invoiced Total */}
         <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ padding: '0.5rem', borderRadius: '10px', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-indigo)' }}>
             <FileText size={20} />
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Invoiced IDR</span>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, marginTop: '0.15rem' }}>{formatCurrency(totalBilledIDR, 'IDR')}</div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Invoiced (Awaiting)</span>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, marginTop: '0.15rem', color: 'var(--accent-indigo)' }}>
+              {formatCurrency(invoicedTotals.idr, 'IDR')}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.05rem' }}>
+              {formatCurrency(invoicedTotals.usd, 'USD')}
+            </div>
           </div>
         </div>
 
-        {/* Total Collected IDR */}
+        {/* Overdue Total */}
+        <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ padding: '0.5rem', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--error)' }}>
+            <AlertCircle size={20} />
+          </div>
+          <div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Overdue Follow-up</span>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, marginTop: '0.15rem', color: 'var(--error)' }}>
+              {formatCurrency(overdueTotals.idr, 'IDR')}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.05rem' }}>
+              {formatCurrency(overdueTotals.usd, 'USD')}
+            </div>
+          </div>
+        </div>
+
+        {/* Settled & Collected Total */}
         <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ padding: '0.5rem', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)' }}>
-            <DollarSign size={20} />
+            <CheckCircle2 size={20} />
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Collected IDR</span>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, marginTop: '0.15rem', color: 'var(--success)' }}>{formatCurrency(totalCollectedIDR, 'IDR')}</div>
-          </div>
-        </div>
-
-        {/* Total Invoiced USD */}
-        <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '0.5rem', borderRadius: '10px', background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-cyan)' }}>
-            <FileText size={20} />
-          </div>
-          <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Invoiced USD</span>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, marginTop: '0.15rem', color: 'var(--accent-cyan)' }}>{formatCurrency(totalBilledUSD, 'USD')}</div>
-          </div>
-        </div>
-
-        {/* Total Collected USD */}
-        <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '0.5rem', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)' }}>
-            <UserCheck size={20} />
-          </div>
-          <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Collected USD</span>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, marginTop: '0.15rem', color: 'var(--success)' }}>{formatCurrency(totalCollectedUSD, 'USD')}</div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Settled & Collected</span>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, marginTop: '0.15rem', color: 'var(--success)' }}>
+              {formatCurrency(settledTotals.idr, 'IDR')}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.05rem' }}>
+              {formatCurrency(settledTotals.usd, 'USD')}
+            </div>
           </div>
         </div>
 
@@ -247,7 +351,7 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.7rem', color: col.id === 'overdue' ? 'var(--error)' : 'var(--text-muted)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.2', fontSize: '0.7rem', color: col.id === 'overdue' ? 'var(--error)' : 'var(--text-muted)' }}>
                         <Calendar size={11} />
                         <span>{mile.dueDate}</span>
                       </div>
