@@ -158,7 +158,7 @@ export const SalesDashboard: React.FC = () => {
             Adjust the expected close-probability (%) for each stage. These values scale the Weighted Pipeline metrics below.
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+          <div className="sales-kpi-grid">
             {(['Lead', 'Qualification', 'Proposal', 'Negotiation'] as SalesDealStage[]).map(stage => (
               <div key={stage} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
@@ -186,7 +186,7 @@ export const SalesDashboard: React.FC = () => {
       )}
 
       {/* KPI Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+      <div className="sales-kpi-grid">
         
         {/* KPI 1: Raw Open Pipeline */}
         <div className="glass-panel" style={{ padding: '1.25rem' }}>
@@ -258,7 +258,7 @@ export const SalesDashboard: React.FC = () => {
       </div>
 
       {/* Main Charts & Analytics Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1.5rem', alignItems: 'stretch' }}>
+      <div className="sales-charts-grid">
         
         {/* Horizontal Funnel stage bars */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>

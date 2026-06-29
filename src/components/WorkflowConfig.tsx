@@ -120,7 +120,7 @@ export const WorkflowConfig: React.FC = () => {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.5fr', gap: '1.5rem', alignItems: 'start' }}>
+      <div className="workflow-config-grid">
         
         {/* Left Side: Template Contract Types List */}
         <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>

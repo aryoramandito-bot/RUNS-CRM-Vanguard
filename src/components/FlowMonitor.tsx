@@ -228,12 +228,9 @@ export const FlowMonitor: React.FC<FlowMonitorProps> = ({ selectedContractId, on
 
       {/* Contract & Project Summary Bar */}
       <div 
-        className="glass-panel" 
+        className="glass-panel flow-summary-grid" 
         style={{ 
           padding: '1.25rem 1.5rem', 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '1rem',
           background: 'var(--bg-secondary)',
           borderLeft: '4px solid var(--accent-indigo)'
         }}
@@ -259,7 +256,7 @@ export const FlowMonitor: React.FC<FlowMonitorProps> = ({ selectedContractId, on
       </div>
 
       {/* Timeline & Detail Form Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+      <div className="flow-layout-grid">
         
         {/* Timeline representation */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>

@@ -678,6 +678,45 @@ h1, h2, h3, h4, h5, h6 {
   gap: 1.5rem;
 }
 
+.sales-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.sales-charts-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 1.5rem;
+}
+
+.sync-layout-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.flow-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.flow-layout-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.workflow-config-grid {
+  display: grid;
+  grid-template-columns: 1fr 2.5fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
 /* Mobile Responsive Styling overrides */
 .mobile-header {
   display: none;
@@ -889,6 +928,18 @@ h1, h2, h3, h4, h5, h6 {
     padding-top: 0.75rem !important;
     align-items: center !important;
     gap: 1rem !important;
+  }
+
+  .sales-kpi-grid,
+  .flow-summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sales-charts-grid,
+  .sync-layout-grid,
+  .flow-layout-grid,
+  .workflow-config-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 

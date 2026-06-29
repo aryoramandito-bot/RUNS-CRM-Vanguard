@@ -288,7 +288,7 @@ function doPost(e) {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+      <div className="sync-layout-grid">
         
         {/* Left Side: Setup & Settings */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
