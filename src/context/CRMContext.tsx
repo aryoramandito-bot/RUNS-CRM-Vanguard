@@ -732,6 +732,16 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('vanguard_stage_probs', JSON.stringify(stageProbabilities));
   }, [stageProbabilities]);
 
+  // Initial auto-pull from Sheets on mount if URL exists
+  useEffect(() => {
+    const initPull = async () => {
+      if (sheetUrl) {
+        await syncFromSheets();
+      }
+    };
+    initPull();
+  }, []);
+
   // Sync pull from Google Sheets
   const syncFromSheets = async (): Promise<{ success: boolean; message: string }> => {
     if (!sheetUrl) return { success: false, message: 'Google Sheets Apps Script URL is not configured.' };

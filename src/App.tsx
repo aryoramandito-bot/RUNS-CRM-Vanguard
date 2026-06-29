@@ -10,9 +10,11 @@ import { WorkflowConfig } from './components/WorkflowConfig';
 import { FlowMonitor } from './components/FlowMonitor';
 import { CollectionMonitor } from './components/CollectionMonitor';
 import { DatabaseSync } from './components/DatabaseSync';
+import { Menu } from 'lucide-react';
 
 function CRMAppContent() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeContractFlowId, setActiveContractFlowId] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('vanguard_theme');
@@ -73,13 +75,32 @@ function CRMAppContent() {
 
   return (
     <div className="app-container">
-      {/* Sidebar navigation */}
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={handleSetTab} 
-        theme={theme} 
-        toggleTheme={toggleTheme} 
-      />
+      {/* Mobile Header Bar */}
+      <header className="mobile-header no-print">
+        <button className="hamburger-btn" onClick={() => setIsSidebarOpen(true)}>
+          <Menu size={20} />
+        </button>
+        <div className="mobile-title">
+          <span style={{ fontWeight: 800 }}>RUN SYSTEM</span>
+          <span style={{ fontSize: '0.65rem', color: 'var(--accent-cyan)', marginLeft: '0.5rem', fontWeight: 700 }}>VANGUARD</span>
+        </div>
+      </header>
+
+      {/* Sidebar navigation wrapped for mobile drawer */}
+      <div className={`sidebar-wrapper ${isSidebarOpen ? 'open' : ''} no-print`}>
+        {isSidebarOpen && (
+          <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)} />
+        )}
+        <Sidebar 
+          activeTab={activeTab} 
+          setActiveTab={(tab) => {
+            handleSetTab(tab);
+            setIsSidebarOpen(false);
+          }} 
+          theme={theme} 
+          toggleTheme={toggleTheme} 
+        />
+      </div>
 
       {/* Main Content Area */}
       <main className="main-content">

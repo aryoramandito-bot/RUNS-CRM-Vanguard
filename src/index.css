@@ -615,3 +615,164 @@ h1, h2, h3, h4, h5, h6 {
     display: none !important;
   }
 }
+
+/* Mobile Responsive Styling overrides */
+.mobile-header {
+  display: none;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-glass);
+  position: sticky;
+  top: 0;
+  z-index: 99;
+}
+
+.hamburger-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-glass);
+}
+
+.mobile-title {
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-wrapper {
+  display: flex;
+}
+
+/* Mobile Devices Styling (Tablet / Phone) */
+@media (max-width: 768px) {
+  .mobile-header {
+    display: flex;
+  }
+  
+  .app-container {
+    flex-direction: column;
+  }
+  
+  .main-content {
+    height: auto;
+    min-height: calc(100vh - 53px);
+    padding: 1.25rem 1rem;
+  }
+  
+  .sidebar-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .sidebar-wrapper.open {
+    transform: translateX(0);
+  }
+  
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    z-index: -1;
+  }
+
+  /* Kanban boards wrapping on mobile */
+  .kanban-board {
+    display: flex;
+    flex-direction: column !important;
+    gap: 1.25rem;
+    overflow-x: visible !important;
+  }
+
+  .kanban-column {
+    width: 100% !important;
+    max-height: 550px;
+  }
+
+  /* Mobile Sales Funnel layout adjustments */
+  .funnel-layout-grid {
+    display: block !important;
+  }
+
+  .funnel-kanban-side.has-selected {
+    display: none !important;
+  }
+
+  .funnel-details-side {
+    width: 100% !important;
+    margin-top: 1rem;
+  }
+
+  .funnel-kanban-grid {
+    display: block !important;
+  }
+
+  .funnel-kanban-column {
+    display: none !important;
+  }
+
+  .funnel-kanban-column.mobile-active {
+    display: flex !important;
+    width: 100% !important;
+    min-height: 350px !important;
+  }
+
+  /* Mobile Sales Funnel Stage Switcher Tab Bar */
+  .mobile-stage-tabs {
+    display: flex;
+    gap: 0.35rem;
+    overflow-x: auto;
+    padding-bottom: 0.75rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border-glass);
+    scrollbar-width: none; /* Hide standard Firefox scrollbar */
+  }
+
+  .mobile-stage-tabs::-webkit-scrollbar {
+    display: none; /* Hide Chrome/Safari scrollbar */
+  }
+  
+  .mobile-stage-tab-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-align: center;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-glass);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  
+  .mobile-stage-tab-btn.active {
+    background: var(--accent-indigo);
+    border-color: var(--accent-indigo);
+    color: white;
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+  }
+}
+

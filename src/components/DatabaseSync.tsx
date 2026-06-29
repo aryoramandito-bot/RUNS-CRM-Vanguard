@@ -19,6 +19,23 @@ export const DatabaseSync: React.FC = () => {
   const [copiedScript, setCopiedScript] = useState(false);
   const [syncResult, setSyncResult] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
 
+  // Password Protection States
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passError, setPassError] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem('vanguard_sync_authed') === 'true';
+  });
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === '12345') {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('vanguard_sync_authed', 'true');
+    } else {
+      setPassError('Incorrect password. Access denied.');
+    }
+  };
+
   const handleSaveUrl = (e: React.FormEvent) => {
     e.preventDefault();
     setSheetUrl(urlInput.trim());
@@ -225,6 +242,40 @@ function doPost(e) {
     setCopiedScript(true);
     setTimeout(() => setCopiedScript(false), 2000);
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div className="glass-panel" style={{ width: '100%', maxWidth: '360px', padding: '2rem', textAlign: 'center' }}>
+          <Database size={40} className="gradient-text" style={{ marginBottom: '1rem' }} />
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.5rem' }}>Database Lock</h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+            Authorized personnel only. Please enter the master password to access database settings.
+          </p>
+          <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <input
+              type="password"
+              placeholder="Enter password"
+              value={passwordInput}
+              onChange={e => {
+                setPasswordInput(e.target.value);
+                setPassError('');
+              }}
+              className="form-input"
+              style={{ textAlign: 'center', fontSize: '1rem', letterSpacing: '0.2rem' }}
+              autoFocus
+            />
+            {passError && (
+              <span style={{ color: 'var(--error)', fontSize: '0.75rem', fontWeight: 600 }}>{passError}</span>
+            )}
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '0.5rem' }}>
+              Unlock Settings
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

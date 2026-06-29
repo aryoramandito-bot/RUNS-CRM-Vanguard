@@ -43,6 +43,7 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
 
   // Selected Deal Detail Sidebar
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
+  const [activeMobileStage, setActiveMobileStage] = useState<SalesDealStage>('Lead');
   const [subTab, setSubTab] = useState<'details' | 'meetings' | 'quotation'>('details');
 
   // Deal Modal States
@@ -424,11 +425,11 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
       </div>
 
       {/* Main workspace layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: selectedDealId ? '1.5fr 1fr' : '1fr', gap: '1.5rem', flexGrow: 1, alignItems: 'stretch' }}>
+      <div className="funnel-layout-grid" style={{ display: 'grid', gridTemplateColumns: selectedDealId ? '1.5fr 1fr' : '1fr', gap: '1.5rem', flexGrow: 1, alignItems: 'stretch' }}>
         
         {/* Kanban Board Column */}
         <div 
-          className="glass-panel" 
+          className={`glass-panel funnel-kanban-side ${selectedDealId ? 'has-selected' : ''}`}
           style={{ 
             padding: '1.5rem', 
             overflowX: 'auto',
@@ -443,12 +444,27 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(180px, 1fr))', gap: '1rem', flexGrow: 1, alignItems: 'start' }}>
+          {/* Mobile stage switcher tabs */}
+          <div className="mobile-stage-tabs no-print">
+            {stages.map(st => (
+              <button
+                key={st}
+                type="button"
+                className={`mobile-stage-tab-btn ${activeMobileStage === st ? 'active' : ''}`}
+                onClick={() => setActiveMobileStage(st)}
+              >
+                {st === 'Closed Won' ? 'Won' : st === 'Closed Lost' ? 'Lost' : st}
+              </button>
+            ))}
+          </div>
+
+          <div className="funnel-kanban-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(180px, 1fr))', gap: '1rem', flexGrow: 1, alignItems: 'start' }}>
             {stages.map(stage => {
               const stageDeals = filteredDeals.filter(d => d.stage === stage);
               return (
                 <div 
                   key={stage} 
+                  className={`funnel-kanban-column ${activeMobileStage === stage ? 'mobile-active' : ''}`}
                   style={{ 
                     background: 'var(--bg-kanban-column)', 
                     border: '1px solid var(--border-glass)', 
@@ -571,7 +587,7 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
 
         {/* Detailed Deal Panel Sidebar */}
         {selectedDeal && (
-          <div className="glass-panel animate-slide-right" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="glass-panel funnel-details-side animate-slide-right" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             
             {/* Sidebar Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
