@@ -80,8 +80,21 @@ export const Dashboard: React.FC<{ onViewContract: (contractId: string) => void 
     });
   });
 
-  const outstandingIDR = totalValueIDR - collectedIDR;
-  const outstandingUSD = totalValueUSD - collectedUSD;
+  let outstandingIDR = 0;
+  let outstandingUSD = 0;
+
+  contracts.forEach(c => {
+    c.stages.forEach(st => {
+      if (st.status === 'Active') {
+        const amt = st.billingAmount || 0;
+        if (c.currency === 'IDR') {
+          outstandingIDR += amt;
+        } else {
+          outstandingUSD += amt;
+        }
+      }
+    });
+  });
 
   // Active / Overdue stages for monitoring alerts
   const today = new Date().toISOString().split('T')[0];
