@@ -107,16 +107,21 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
   // 3. INVOICED / AWAITING PAYMENT: Category Collection with status Active (or category Billing done but Collection is pending, but Collection status Active handles this beautifully)
   // 4. SETTLED / COLLECTED: Category Collection with status Done
   
-  const overdueMilestones = filteredMilestones.filter(m => m.status !== 'Done' && m.status !== 'Skipped' && m.dueDate < today);
+  const overdueMilestones = filteredMilestones.filter(m => 
+    m.status !== 'Done' && 
+    m.status !== 'Skipped' && 
+    m.dueDate && 
+    m.dueDate < today
+  );
   
   const plannedMilestones = filteredMilestones.filter(m => 
     (m.status === 'Pending') && 
-    m.dueDate >= today
+    (!m.dueDate || m.dueDate >= today)
   );
 
   const invoicedMilestones = filteredMilestones.filter(m => 
     m.status === 'Active' && 
-    m.dueDate >= today
+    (!m.dueDate || m.dueDate >= today)
   );
 
   const settledMilestones = filteredMilestones.filter(m => 

@@ -92,7 +92,7 @@ export const FlowMonitor: React.FC<FlowMonitorProps> = ({ selectedContractId, on
 
   const handleAddCustomStage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contract || !customName.trim() || !customDueDate) return;
+    if (!contract || !customName.trim()) return;
 
     addCustomStage(
       contract.id,
@@ -425,7 +425,6 @@ export const FlowMonitor: React.FC<FlowMonitorProps> = ({ selectedContractId, on
                   <label className="form-label">Due Date</label>
                   <input
                     type="date"
-                    required
                     value={stageDueDate}
                     onChange={e => setStageDueDate(e.target.value)}
                     className="form-input"
@@ -585,10 +584,9 @@ export const FlowMonitor: React.FC<FlowMonitorProps> = ({ selectedContractId, on
                     </select>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Due Date *</label>
+                    <label className="form-label">Due Date</label>
                     <input
                       type="date"
-                      required
                       value={customDueDate}
                       onChange={e => setCustomDueDate(e.target.value)}
                       className="form-input"
