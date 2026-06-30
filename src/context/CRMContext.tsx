@@ -38,6 +38,9 @@ interface CRMContextType {
   syncFromTurso: () => Promise<{ success: boolean; message: string }>;
   syncToTurso: (targetUrl?: string, targetToken?: string) => Promise<{ success: boolean; message: string }>;
   lastSyncTime: string;
+  hasInitialized: boolean;
+  syncError: string | null;
+  retryInitialPull: () => Promise<void>;
 
   // Company Operations
   addCompany: (company: Omit<ClientCompany, 'id' | 'dateAdded'>) => void;
@@ -709,6 +712,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return localStorage.getItem('vanguard_auto_sync') !== 'false';
   });
   const [hasInitialized, setHasInitialized] = useState<boolean>(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   
   const setAutoSync = (val: boolean) => {
     setAutoSyncState(val);
@@ -807,18 +811,44 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Initial auto-pull from Turso / Sheets on mount if credentials exist
   useEffect(() => {
     const initPull = async () => {
-      if (tursoUrl && tursoToken) {
-        await syncFromTurso();
-      } else if (sheetUrl) {
-        await syncFromSheets();
-      }
-      // Wait 3 seconds for all state setters to batch and settle before enabling auto-push
-      setTimeout(() => {
+      if ((tursoUrl && tursoToken) || sheetUrl) {
+        setSyncError(null);
+        try {
+          const res = (tursoUrl && tursoToken) ? await syncFromTurso() : await syncFromSheets();
+          if (res.success) {
+            setHasInitialized(true);
+          } else {
+            setSyncError(res.message);
+          }
+        } catch (err: any) {
+          setSyncError(err.message || 'Unknown database connection error');
+        }
+      } else {
+        // No database configured, run in local sandbox immediately
         setHasInitialized(true);
-      }, 3000);
+      }
     };
     initPull();
   }, []);
+
+  const retryInitialPull = async () => {
+    setSyncError(null);
+    setHasInitialized(false);
+    if ((tursoUrl && tursoToken) || sheetUrl) {
+      try {
+        const res = (tursoUrl && tursoToken) ? await syncFromTurso() : await syncFromSheets();
+        if (res.success) {
+          setHasInitialized(true);
+        } else {
+          setSyncError(res.message);
+        }
+      } catch (err: any) {
+        setSyncError(err.message || 'Unknown database connection error');
+      }
+    } else {
+      setHasInitialized(true);
+    }
+  };
 
   // Sync pull from Google Sheets
   const syncFromSheets = async (): Promise<{ success: boolean; message: string }> => {
@@ -1485,6 +1515,9 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         syncFromTurso,
         syncToTurso,
         lastSyncTime,
+        hasInitialized,
+        syncError,
+        retryInitialPull,
         addCompany,
         updateCompany,
         deleteCompany,

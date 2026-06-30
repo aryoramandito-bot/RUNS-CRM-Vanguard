@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CRMProvider } from './context/CRMContext';
+import { CRMProvider, useCRM } from './context/CRMContext';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { SalesFunnel } from './components/SalesFunnel';
@@ -11,9 +11,18 @@ import { FlowMonitor } from './components/FlowMonitor';
 import { CollectionMonitor } from './components/CollectionMonitor';
 import { DatabaseSync } from './components/DatabaseSync';
 import { QuickMeetingLog } from './components/QuickMeetingLog';
-import { Menu } from 'lucide-react';
+import { Menu, Database, AlertTriangle, RefreshCw } from 'lucide-react';
 
 function CRMAppContent() {
+  const {
+    hasInitialized,
+    syncError,
+    retryInitialPull,
+    setTursoUrl,
+    setTursoToken,
+    setSheetUrl
+  } = useCRM();
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeContractFlowId, setActiveContractFlowId] = useState<string | null>(null);
@@ -75,6 +84,95 @@ function CRMAppContent() {
         return <Dashboard onViewContract={handleManageWorkflow} />;
     }
   };
+
+  if (!hasInitialized) {
+    if (syncError) {
+      return (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          width: '100vw',
+          background: 'var(--bg-primary)',
+          color: 'var(--text-primary)',
+          padding: '2rem'
+        }}>
+          <div className="glass-panel animate-fade-in" style={{ maxWidth: '440px', padding: '2.5rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.25rem', alignItems: 'center' }}>
+            <AlertTriangle size={48} style={{ color: 'var(--accent-amber)' }} />
+            <div>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Database Sync Failure</h3>
+              <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', marginTop: '0.5rem', lineHeight: 1.45 }}>
+                Vanguard could not pull the latest database state. To prevent data corruption or overwriting updates from other devices, access is locked.
+              </p>
+            </div>
+            
+            <div style={{
+              background: 'rgba(244, 63, 94, 0.08)',
+              border: '1px solid rgba(244, 63, 94, 0.2)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '0.75rem 1rem',
+              fontSize: '0.75rem',
+              color: 'var(--error)',
+              fontFamily: 'monospace',
+              width: '100%',
+              textAlign: 'left',
+              wordBreak: 'break-all'
+            }}>
+              Error: {syncError}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', marginTop: '0.5rem' }}>
+              <button 
+                onClick={retryInitialPull}
+                className="btn btn-primary"
+                style={{ width: '100%', gap: '0.5rem', justifyContent: 'center' }}
+              >
+                <RefreshCw size={15} /> Retry Connection
+              </button>
+              <button 
+                onClick={() => {
+                  if (window.confirm("Disconnecting from the database will revert you back to local sandbox mode. Stored credentials will be cleared. Do you wish to proceed?")) {
+                    setTursoUrl('');
+                    setTursoToken('');
+                    setSheetUrl('');
+                    // Reload page to start cleanly in sandbox
+                    window.location.reload();
+                  }
+                }}
+                className="btn btn-secondary"
+                style={{ width: '100%', color: 'var(--error)', borderColor: 'rgba(244, 63, 94, 0.3)' }}
+              >
+                Disconnect & Run Offline
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        width: '100vw',
+        background: 'var(--bg-primary)',
+        color: 'var(--text-primary)'
+      }}>
+        <div className="animate-fade-in" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+          <Database size={40} className="gradient-text" style={{ animation: 'pulse 1.5s infinite' }} />
+          <div>
+            <h4 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Synchronizing Database</h4>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginTop: '0.2rem' }}>
+              Fetching latest cloud state to link your session...
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
