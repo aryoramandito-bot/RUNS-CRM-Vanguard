@@ -607,9 +607,16 @@ const cleanDatesInObject = <T,>(obj: T): T => {
 };
 
 export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const shouldBypassCache = (): boolean => {
+    const tursoSaved = localStorage.getItem('vanguard_turso_url');
+    const sheetsSaved = localStorage.getItem('vanguard_sheets_url');
+    const activeTursoUrl = tursoSaved !== null ? tursoSaved : 'libsql://runs-vanguard-crm-aryoramandito.aws-ap-northeast-1.turso.io';
+    const activeSheetsUrl = sheetsSaved !== null ? sheetsSaved : 'https://script.google.com/macros/s/AKfycby0n9ubHy9zkLk47U4dzyzGrCE9hueKKWfgWGU04CWWuN-pPD7dwaHEJoISBgwzPdu38Q/exec';
+    return !!(activeTursoUrl || activeSheetsUrl);
+  };
+
   const [companies, setCompaniesState] = useState<ClientCompany[]>(() => {
-    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
-    if (hasDB) return [];
+    if (shouldBypassCache()) return [];
 
     const saved = localStorage.getItem('vanguard_companies');
     // Migration check: check if old vanguard_customers exists and contains company data
@@ -637,8 +644,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [contacts, setContactsState] = useState<ClientContact[]>(() => {
-    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
-    if (hasDB) return [];
+    if (shouldBypassCache()) return [];
 
     const saved = localStorage.getItem('vanguard_contacts');
     // Migration check: if old customers exist, we can migrate them as contacts too
@@ -668,8 +674,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [projects, setProjectsState] = useState<Project[]>(() => {
-    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
-    if (hasDB) return [];
+    if (shouldBypassCache()) return [];
 
     const saved = localStorage.getItem('vanguard_projects');
     if (saved) {
@@ -688,32 +693,28 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [contracts, setContractsState] = useState<Contract[]>(() => {
-    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
-    if (hasDB) return [];
+    if (shouldBypassCache()) return [];
 
     const saved = localStorage.getItem('vanguard_contracts');
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedContracts);
   });
 
   const [templates, setTemplatesState] = useState<WorkflowTemplate[]>(() => {
-    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
-    if (hasDB) return [];
+    if (shouldBypassCache()) return [];
 
     const saved = localStorage.getItem('vanguard_templates');
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(defaultTemplates);
   });
 
   const [deals, setDealsState] = useState<SalesDeal[]>(() => {
-    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
-    if (hasDB) return [];
+    if (shouldBypassCache()) return [];
 
     const saved = localStorage.getItem('vanguard_deals');
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedDeals);
   });
 
   const [meetings, setMeetingsState] = useState<MeetingLog[]>(() => {
-    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
-    if (hasDB) return [];
+    if (shouldBypassCache()) return [];
 
     const saved = localStorage.getItem('vanguard_meetings');
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedMeetings);
@@ -857,10 +858,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Turso Integration State
   const [tursoUrl, setTursoUrlState] = useState<string>(() => {
-    return localStorage.getItem('vanguard_turso_url') || '';
+    const val = localStorage.getItem('vanguard_turso_url');
+    return val !== null ? val : 'libsql://runs-vanguard-crm-aryoramandito.aws-ap-northeast-1.turso.io';
   });
   const [tursoToken, setTursoTokenState] = useState<string>(() => {
-    return localStorage.getItem('vanguard_turso_token') || '';
+    const val = localStorage.getItem('vanguard_turso_token');
+    return val !== null ? val : 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODI3OTg0MzAsImlkIjoiMDE5ZjE2MjUtYTQwMS03MzY4LWIwNTEtNGNkNGZiZDA4ZjU2Iiwia2lkIjoiN1ROMUFUclFnTGtiRDAxUzVRQUsyS1QxZXQ4cHZjLVd4bkJhUEN3UTdlbyIsInJpZCI6IjUxN2I0Yzg5LWNkMjEtNDZiNi05ODY1LWE3NTI0YzU0NmEwYiJ9.XVYu41CGLIYW5LvdMohufmfKmzRC798WyGmJYi8S7oRXzqC7J16zHR7chFNSkKeHR_uX4cTI8ASLVVl6ZO10Bg';
   });
 
   const setTursoUrl = (url: string) => {
