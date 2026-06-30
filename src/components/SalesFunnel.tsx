@@ -46,6 +46,16 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
   const [activeMobileStage, setActiveMobileStage] = useState<SalesDealStage>('Lead');
   const [subTab, setSubTab] = useState<'details' | 'meetings' | 'quotation'>('details');
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Deal Modal States
   const [isDealModalOpen, setIsDealModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<SalesDeal | null>(null);
@@ -445,18 +455,20 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
           </div>
 
           {/* Mobile stage switcher tabs */}
-          <div className="mobile-stage-tabs no-print">
-            {stages.map(st => (
-              <button
-                key={st}
-                type="button"
-                className={`mobile-stage-tab-btn ${activeMobileStage === st ? 'active' : ''}`}
-                onClick={() => setActiveMobileStage(st)}
-              >
-                {st === 'Closed Won' ? 'Won' : st === 'Closed Lost' ? 'Lost' : st}
-              </button>
-            ))}
-          </div>
+          {isMobile && (
+            <div className="mobile-stage-tabs no-print">
+              {stages.map(st => (
+                <button
+                  key={st}
+                  type="button"
+                  className={`mobile-stage-tab-btn ${activeMobileStage === st ? 'active' : ''}`}
+                  onClick={() => setActiveMobileStage(st)}
+                >
+                  {st === 'Closed Won' ? 'Won' : st === 'Closed Lost' ? 'Lost' : st}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="funnel-kanban-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(180px, 1fr))', gap: '1rem', flexGrow: 1, alignItems: 'start' }}>
             {stages.map(stage => {
