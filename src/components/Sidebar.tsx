@@ -21,7 +21,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, theme, toggleTheme }) => {
-  const { sheetUrl } = useCRM();
+  const { sheetUrl, tursoUrl, lastSyncTime } = useCRM();
   
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -161,9 +161,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, theme
           </button>
         </div>
 
-        <div>Workspace: {sheetUrl ? 'Google Sheets Cloud' : 'Offline sandbox'}</div>
-        <div style={{ color: sheetUrl ? 'var(--success)' : 'var(--accent-indigo)', fontWeight: 600 }}>
-          {sheetUrl ? '● Sync Connected' : 'Active workspace: IDR/USD'}
+        <div>Workspace: <strong>{tursoUrl ? 'Turso SQLite' : sheetUrl ? 'Google Sheets' : 'Local Sandbox'}</strong></div>
+        <div style={{ color: (tursoUrl || sheetUrl) ? 'var(--success)' : 'var(--accent-indigo)', fontWeight: 600, display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+          <span>{(tursoUrl || sheetUrl) ? '● Sync Connected' : 'Active workspace: IDR/USD'}</span>
+          {lastSyncTime && (
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+              Updated: {lastSyncTime}
+            </span>
+          )}
         </div>
       </div>
     </aside>

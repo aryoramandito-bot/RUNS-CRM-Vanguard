@@ -18,7 +18,8 @@ export const DatabaseSync: React.FC = () => {
     syncFromSheets, syncToSheets,
     tursoUrl, setTursoUrl,
     tursoToken, setTursoToken,
-    syncFromTurso, syncToTurso
+    syncFromTurso, syncToTurso,
+    lastSyncTime
   } = useCRM();
   
   const [urlInput, setUrlInput] = useState(sheetUrl);
@@ -456,11 +457,29 @@ CREATE TABLE IF NOT EXISTS meetings (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
       {/* Header */}
-      <div>
-        <h2 style={{ fontSize: '1.8rem', fontWeight: 800 }}>Database Integration</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.2rem' }}>
-          Connect RUN System Vanguard to a serverless SQLite database (Turso) or a Google Sheets spreadsheet for cloud data persistence.
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.8rem', fontWeight: 800 }}>Database Integration</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.2rem' }}>
+            Connect RUN System Vanguard to a serverless SQLite database (Turso) or a Google Sheets spreadsheet for cloud data persistence.
+          </p>
+        </div>
+        {lastSyncTime && (
+          <div style={{ 
+            fontSize: '0.75rem', 
+            background: 'var(--success-glow)', 
+            border: '1px solid rgba(16, 185, 129, 0.15)', 
+            padding: '0.45rem 0.85rem', 
+            borderRadius: 'var(--radius-sm)',
+            color: 'var(--success)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem'
+          }}>
+            <span className="sync-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--success)', display: 'inline-block', boxShadow: '0 0 6px var(--success)' }} />
+            <span>Last Update: <strong>{lastSyncTime}</strong></span>
+          </div>
+        )}
       </div>
 
       <div className="sync-layout-grid">

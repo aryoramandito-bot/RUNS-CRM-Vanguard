@@ -37,6 +37,7 @@ interface CRMContextType {
   setTursoToken: (token: string) => void;
   syncFromTurso: () => Promise<{ success: boolean; message: string }>;
   syncToTurso: (targetUrl?: string, targetToken?: string) => Promise<{ success: boolean; message: string }>;
+  lastSyncTime: string;
 
   // Company Operations
   addCompany: (company: Omit<ClientCompany, 'id' | 'dateAdded'>) => void;
@@ -739,6 +740,24 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('vanguard_turso_token', token);
   };
 
+  const [lastSyncTime, setLastSyncTimeState] = useState<string>(() => {
+    return localStorage.getItem('vanguard_last_sync_time') || '';
+  });
+
+  const updateTimestamp = () => {
+    const timestamp = new Date().toLocaleString('en-GB', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit',
+      hour12: true
+    }).replace(',', '');
+    setLastSyncTimeState(timestamp);
+    localStorage.setItem('vanguard_last_sync_time', timestamp);
+  };
+
   const getTursoClient = (url = tursoUrl, token = tursoToken) => {
     if (!url || !token) return null;
     try {
@@ -835,6 +854,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         skipAutoPushRef.current = false;
       }, 2000);
 
+      updateTimestamp();
       return { success: true, message: 'Successfully pulled database state from Google Sheets!' };
     } catch (error: any) {
       setIsSyncing(false);
@@ -883,6 +903,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       setIsSyncing(false);
       if (resJson.success) {
+        updateTimestamp();
         return { success: true, message: 'Successfully pushed database state to Google Sheets!' };
       } else {
         return { success: false, message: 'Apps Script reported failure writing to sheets.' };
@@ -1067,6 +1088,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         skipAutoPushRef.current = false;
       }, 2000);
 
+      updateTimestamp();
       return { success: true, message: 'Successfully pulled database state from Turso SQLite!' };
     } catch (error: any) {
       setIsSyncing(false);
@@ -1148,6 +1170,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       await client.batch(statements, "write");
       setIsSyncing(false);
+      updateTimestamp();
       return { success: true, message: 'Successfully pushed database state to Turso SQLite!' };
     } catch (error: any) {
       setIsSyncing(false);
@@ -1461,6 +1484,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTursoToken,
         syncFromTurso,
         syncToTurso,
+        lastSyncTime,
         addCompany,
         updateCompany,
         deleteCompany,
