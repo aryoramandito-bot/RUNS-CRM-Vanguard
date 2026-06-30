@@ -10,6 +10,7 @@ import type {
   SalesDealStage,
   MeetingLog,
 } from '../types/crm';
+import { createClient } from '@libsql/client/web';
 
 interface CRMContextType {
   companies: ClientCompany[];
@@ -28,6 +29,14 @@ interface CRMContextType {
   setAutoSync: (val: boolean) => void;
   syncFromSheets: () => Promise<{ success: boolean; message: string }>;
   syncToSheets: (targetUrl?: string) => Promise<{ success: boolean; message: string }>;
+
+  // Turso Integration
+  tursoUrl: string;
+  setTursoUrl: (url: string) => void;
+  tursoToken: string;
+  setTursoToken: (token: string) => void;
+  syncFromTurso: () => Promise<{ success: boolean; message: string }>;
+  syncToTurso: (targetUrl?: string, targetToken?: string) => Promise<{ success: boolean; message: string }>;
 
   // Company Operations
   addCompany: (company: Omit<ClientCompany, 'id' | 'dateAdded'>) => void;
@@ -712,6 +721,37 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('vanguard_sheets_url', url);
   };
 
+  // Turso Integration State
+  const [tursoUrl, setTursoUrlState] = useState<string>(() => {
+    return localStorage.getItem('vanguard_turso_url') || '';
+  });
+  const [tursoToken, setTursoTokenState] = useState<string>(() => {
+    return localStorage.getItem('vanguard_turso_token') || '';
+  });
+
+  const setTursoUrl = (url: string) => {
+    setTursoUrlState(url);
+    localStorage.setItem('vanguard_turso_url', url);
+  };
+
+  const setTursoToken = (token: string) => {
+    setTursoTokenState(token);
+    localStorage.setItem('vanguard_turso_token', token);
+  };
+
+  const getTursoClient = (url = tursoUrl, token = tursoToken) => {
+    if (!url || !token) return null;
+    try {
+      return createClient({
+        url: url.trim(),
+        authToken: token.trim()
+      });
+    } catch (e) {
+      console.error("Failed to initialize Turso client:", e);
+      return null;
+    }
+  };
+
   // Sync to localStorage
   useEffect(() => {
     localStorage.setItem('vanguard_companies', JSON.stringify(companies));
@@ -745,10 +785,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('vanguard_stage_probs', JSON.stringify(stageProbabilities));
   }, [stageProbabilities]);
 
-  // Initial auto-pull from Sheets on mount if URL exists
+  // Initial auto-pull from Turso / Sheets on mount if credentials exist
   useEffect(() => {
     const initPull = async () => {
-      if (sheetUrl) {
+      if (tursoUrl && tursoToken) {
+        await syncFromTurso();
+      } else if (sheetUrl) {
         await syncFromSheets();
       }
       // Wait 3 seconds for all state setters to batch and settle before enabling auto-push
@@ -839,26 +881,285 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         resJson = { success: true };
       }
 
+  // Sync pull from Turso SQLite
+  const syncFromTurso = async (): Promise<{ success: boolean; message: string }> => {
+    const client = getTursoClient();
+    if (!client) return { success: false, message: 'Turso URL or Auth Token is not configured.' };
+
+    setIsSyncing(true);
+    try {
+      const results = await client.batch([
+        "SELECT * FROM companies;",
+        "SELECT * FROM contacts;",
+        "SELECT * FROM projects;",
+        "SELECT * FROM contracts;",
+        "SELECT * FROM templates;",
+        "SELECT * FROM deals;",
+        "SELECT * FROM meetings;"
+      ], "read");
+
+      // Parse results
+      const dbCompanies = results[0].rows as unknown as any[];
+      const dbContacts = results[1].rows as unknown as any[];
+      const dbProjects = results[2].rows as unknown as any[];
+      const dbContracts = results[3].rows as unknown as any[];
+      const dbTemplates = results[4].rows as unknown as any[];
+      const dbDeals = results[5].rows as unknown as any[];
+      const dbMeetings = results[6].rows as unknown as any[];
+
+      // Map values and handle JSON strings
+      const parsedCompanies = dbCompanies.map(c => ({
+        id: String(c.id),
+        name: String(c.name),
+        industry: c.industry ? String(c.industry) : '',
+        email: c.email ? String(c.email) : '',
+        phone: c.phone ? String(c.phone) : '',
+        address: c.address ? String(c.address) : '',
+        status: c.status ? String(c.status) : 'Active',
+        dateAdded: c.dateAdded ? String(c.dateAdded) : new Date().toISOString()
+      }));
+
+      const parsedContacts = dbContacts.map(c => ({
+        id: String(c.id),
+        companyId: String(c.companyId),
+        name: String(c.name),
+        email: c.email ? String(c.email) : '',
+        phone: c.phone ? String(c.phone) : '',
+        status: c.status ? String(c.status) : 'Active',
+        role: c.role ? String(c.role) : '',
+        dateAdded: c.dateAdded ? String(c.dateAdded) : new Date().toISOString()
+      }));
+
+      const parsedProjects = dbProjects.map(p => ({
+        id: String(p.id),
+        companyId: String(p.companyId),
+        name: String(p.name),
+        code: p.code ? String(p.code) : '',
+        budget: Number(p.budget) || 0,
+        currency: p.currency ? String(p.currency) : 'IDR',
+        status: p.status ? String(p.status) : 'Planning',
+        startDate: p.startDate ? String(p.startDate) : '',
+        endDate: p.endDate ? String(p.endDate) : '',
+        description: p.description ? String(p.description) : ''
+      }));
+
+      const parsedContracts = dbContracts.map(c => {
+        let parsedStages = [];
+        if (c.stages) {
+          try {
+            parsedStages = typeof c.stages === 'string' ? JSON.parse(c.stages) : c.stages;
+          } catch (e) {
+            console.error("Failed to parse stages JSON:", e);
+          }
+        }
+        return {
+          id: String(c.id),
+          projectId: String(c.projectId),
+          title: String(c.title),
+          contractNumber: c.contractNumber ? String(c.contractNumber) : '',
+          type: c.type ? String(c.type) : 'Fixed Price',
+          value: Number(c.value) || 0,
+          currency: c.currency ? String(c.currency) : 'IDR',
+          status: c.status ? String(c.status) : 'Active',
+          signDate: c.signDate ? String(c.signDate) : '',
+          startDate: c.startDate ? String(c.startDate) : '',
+          endDate: c.endDate ? String(c.endDate) : '',
+          stages: parsedStages
+        };
+      });
+
+      const parsedTemplates = dbTemplates.map(t => {
+        let parsedStages = [];
+        if (t.stages) {
+          try {
+            parsedStages = typeof t.stages === 'string' ? JSON.parse(t.stages) : t.stages;
+          } catch (e) {
+            console.error("Failed to parse template stages JSON:", e);
+          }
+        }
+        return {
+          contractType: String(t.contractType),
+          stages: parsedStages
+        };
+      });
+
+      const parsedDeals = dbDeals.map(d => {
+        let parsedQuotationItems = [];
+        if (d.quotationItems) {
+          try {
+            parsedQuotationItems = typeof d.quotationItems === 'string' ? JSON.parse(d.quotationItems) : d.quotationItems;
+          } catch (e) {
+            console.error("Failed to parse quotation items JSON:", e);
+          }
+        }
+        return {
+          id: String(d.id),
+          companyId: String(d.companyId),
+          contactId: String(d.contactId),
+          title: String(d.title),
+          stage: String(d.stage) as SalesDealStage,
+          value: Number(d.value) || 0,
+          currency: d.currency ? String(d.currency) : 'IDR',
+          estimatedCloseDate: d.estimatedCloseDate ? String(d.estimatedCloseDate) : '',
+          description: d.description ? String(d.description) : '',
+          createdAt: d.createdAt ? String(d.createdAt) : new Date().toISOString(),
+          quotationItems: parsedQuotationItems,
+          quotationDate: d.quotationDate ? String(d.quotationDate) : undefined,
+          quotationExpiry: d.quotationExpiry ? String(d.quotationExpiry) : undefined,
+          quotationTerms: d.quotationTerms ? String(d.quotationTerms) : undefined
+        };
+      });
+
+      const parsedMeetings = dbMeetings.map(m => {
+        let parsedAttendees = [];
+        if (m.attendees) {
+          try {
+            parsedAttendees = typeof m.attendees === 'string' ? JSON.parse(m.attendees) : m.attendees;
+          } catch (e) {
+            console.error("Failed to parse attendees JSON:", e);
+          }
+        }
+        let parsedDocuments = [];
+        if (m.documents) {
+          try {
+            parsedDocuments = typeof m.documents === 'string' ? JSON.parse(m.documents) : m.documents;
+          } catch (e) {
+            console.error("Failed to parse documents JSON:", e);
+          }
+        }
+        return {
+          id: String(m.id),
+          companyId: String(m.companyId),
+          title: String(m.title),
+          date: String(m.date),
+          time: String(m.time),
+          type: String(m.type) as any,
+          status: String(m.status) as any,
+          summary: m.summary ? String(m.summary) : '',
+          actionItems: m.actionItems ? String(m.actionItems) : '',
+          attendees: parsedAttendees,
+          documents: parsedDocuments
+        };
+      });
+
+      // Update Local State (safeguarded by skipAutoPushRef)
+      skipAutoPushRef.current = true;
+      if (parsedCompanies.length > 0) setCompanies(parsedCompanies);
+      if (parsedContacts.length > 0) setContacts(parsedContacts);
+      if (parsedProjects.length > 0) setProjects(parsedProjects);
+      if (parsedContracts.length > 0) setContracts(parsedContracts);
+      if (parsedTemplates.length > 0) setTemplates(parsedTemplates);
+      if (parsedDeals.length > 0) setDeals(parsedDeals);
+      if (parsedMeetings.length > 0) setMeetings(parsedMeetings);
+
+      localStorage.setItem('vanguard_has_pulled', 'true');
       setIsSyncing(false);
-      if (resJson.success) {
-        return { success: true, message: 'Successfully pushed database state to Google Sheets!' };
-      } else {
-        return { success: false, message: 'Apps Script reported failure writing to sheets.' };
-      }
+      
+      setTimeout(() => {
+        skipAutoPushRef.current = false;
+      }, 2000);
+
+      return { success: true, message: 'Successfully pulled database state from Turso SQLite!' };
     } catch (error: any) {
       setIsSyncing(false);
-      return { success: false, message: `Failed to push to Google Sheets: ${error.message}` };
+      return { success: false, message: `Failed to pull from Turso: ${error.message}` };
+    }
+  };
+
+  // Sync push to Turso SQLite
+  const syncToTurso = async (targetUrl = tursoUrl, targetToken = tursoToken): Promise<{ success: boolean; message: string }> => {
+    const client = getTursoClient(targetUrl, targetToken);
+    if (!client) return { success: false, message: 'Turso URL or Auth Token is not configured.' };
+
+    setIsSyncing(true);
+    try {
+      const statements: any[] = [];
+
+      // Companies
+      statements.push("DELETE FROM companies;");
+      companies.forEach(c => {
+        statements.push({
+          sql: "INSERT INTO companies (id, name, industry, email, phone, address, status, dateAdded) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
+          args: [c.id, c.name, c.industry, c.email, c.phone, c.address, c.status, c.dateAdded]
+        });
+      });
+
+      // Contacts
+      statements.push("DELETE FROM contacts;");
+      contacts.forEach(c => {
+        statements.push({
+          sql: "INSERT INTO contacts (id, companyId, name, email, phone, status, role, dateAdded) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
+          args: [c.id, c.companyId, c.name, c.email, c.phone, c.status, c.role, c.dateAdded]
+        });
+      });
+
+      // Projects
+      statements.push("DELETE FROM projects;");
+      projects.forEach(p => {
+        statements.push({
+          sql: "INSERT INTO projects (id, companyId, name, code, budget, currency, status, startDate, endDate, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+          args: [p.id, p.companyId, p.name, p.code, p.budget, p.currency, p.status, p.startDate, p.endDate, p.description]
+        });
+      });
+
+      // Contracts
+      statements.push("DELETE FROM contracts;");
+      contracts.forEach(c => {
+        statements.push({
+          sql: "INSERT INTO contracts (id, projectId, title, contractNumber, type, value, currency, status, signDate, startDate, endDate, stages) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+          args: [c.id, c.projectId, c.title, c.contractNumber, c.type, c.value, c.currency, c.status, c.signDate, c.startDate, c.endDate, JSON.stringify(c.stages)]
+        });
+      });
+
+      // Templates
+      statements.push("DELETE FROM templates;");
+      templates.forEach(t => {
+        statements.push({
+          sql: "INSERT INTO templates (contractType, stages) VALUES (?, ?);",
+          args: [t.contractType, JSON.stringify(t.stages)]
+        });
+      });
+
+      // Deals
+      statements.push("DELETE FROM deals;");
+      deals.forEach(d => {
+        statements.push({
+          sql: "INSERT INTO deals (id, companyId, contactId, title, stage, value, currency, estimatedCloseDate, description, createdAt, quotationItems, quotationDate, quotationExpiry, quotationTerms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+          args: [d.id, d.companyId, d.contactId, d.title, d.stage, d.value, d.currency, d.estimatedCloseDate, d.description, d.createdAt, JSON.stringify(d.quotationItems || []), d.quotationDate || "", d.quotationExpiry || "", d.quotationTerms || ""]
+        });
+      });
+
+      // Meetings
+      statements.push("DELETE FROM meetings;");
+      meetings.forEach(m => {
+        statements.push({
+          sql: "INSERT INTO meetings (id, companyId, title, date, time, type, status, summary, actionItems, attendees, documents) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+          args: [m.id, m.companyId, m.title, m.date, m.time, m.type, m.status, m.summary || "", m.actionItems || "", JSON.stringify(m.attendees || []), JSON.stringify(m.documents || [])]
+        });
+      });
+
+      await client.batch(statements, "write");
+      setIsSyncing(false);
+      return { success: true, message: 'Successfully pushed database state to Turso SQLite!' };
+    } catch (error: any) {
+      setIsSyncing(false);
+      return { success: false, message: `Failed to push to Turso: ${error.message}` };
     }
   };
 
   // Debounced auto-save effect
   useEffect(() => {
-    if (!hasInitialized || !autoSync || !sheetUrl || skipAutoPushRef.current) return;
+    if (!hasInitialized || !autoSync || skipAutoPushRef.current) return;
+    if (!tursoUrl && !sheetUrl) return;
 
     const timer = setTimeout(async () => {
-      console.log('Debounced auto-saving changes to Google Sheets...');
+      console.log('Debounced auto-saving changes...');
       try {
-        await syncToSheets();
+        if (tursoUrl && tursoToken) {
+          await syncToTurso();
+        } else if (sheetUrl) {
+          await syncToSheets();
+        }
       } catch (e) {
         console.error('Auto-sync push failed:', e);
       }
@@ -1146,6 +1447,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAutoSync,
         syncFromSheets,
         syncToSheets,
+        tursoUrl,
+        setTursoUrl,
+        tursoToken,
+        setTursoToken,
+        syncFromTurso,
+        syncToTurso,
         addCompany,
         updateCompany,
         deleteCompany,

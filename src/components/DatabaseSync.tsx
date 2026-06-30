@@ -13,11 +13,23 @@ import {
 } from 'lucide-react';
 
 export const DatabaseSync: React.FC = () => {
-  const { sheetUrl, setSheetUrl, isSyncing, autoSync, setAutoSync, syncFromSheets, syncToSheets } = useCRM();
+  const { 
+    sheetUrl, setSheetUrl, 
+    isSyncing, autoSync, setAutoSync, 
+    syncFromSheets, syncToSheets,
+    tursoUrl, setTursoUrl,
+    tursoToken, setTursoToken,
+    syncFromTurso, syncToTurso
+  } = useCRM();
   
   const [urlInput, setUrlInput] = useState(sheetUrl);
   const [copiedScript, setCopiedScript] = useState(false);
   const [syncResult, setSyncResult] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
+
+  // Turso local inputs
+  const [tursoUrlInput, setTursoUrlInput] = useState(tursoUrl);
+  const [tursoTokenInput, setTursoTokenInput] = useState(tursoToken);
+  const [copiedTursoSchema, setCopiedTursoSchema] = useState(false);
 
   // Password Protection States
   const [passwordInput, setPasswordInput] = useState('');
@@ -74,6 +86,48 @@ export const DatabaseSync: React.FC = () => {
       const res = await syncToSheets(urlInput.trim());
       if (res.success) {
         setSheetUrl(urlInput.trim()); // Save URL on successful connection
+        setSyncResult({ type: 'success', message: res.message });
+      } else {
+        setSyncResult({ type: 'error', message: res.message });
+      }
+    }
+  };
+
+  const handleSaveTurso = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTursoUrl(tursoUrlInput.trim());
+    setTursoToken(tursoTokenInput.trim());
+    setSyncResult({ type: 'success', message: 'Turso SQLite configuration saved successfully!' });
+  };
+
+  const handleTursoPull = async () => {
+    if (!tursoUrl) {
+      setSyncResult({ type: 'error', message: 'Please save a valid Turso Database URL first.' });
+      return;
+    }
+
+    if (window.confirm('Pulling from Turso will overwrite your current local database data. Do you wish to proceed?')) {
+      const res = await syncFromTurso();
+      if (res.success) {
+        setHasPulled(true);
+        setSyncResult({ type: 'success', message: res.message });
+      } else {
+        setSyncResult({ type: 'error', message: res.message });
+      }
+    }
+  };
+
+  const handleTursoPush = async () => {
+    if (!tursoUrlInput || !tursoTokenInput) {
+      setSyncResult({ type: 'error', message: 'Please provide a valid Turso URL and Auth Token.' });
+      return;
+    }
+
+    if (window.confirm('Pushing to Turso will overwrite all data in your Turso cloud database. Do you wish to proceed?')) {
+      const res = await syncToTurso(tursoUrlInput.trim(), tursoTokenInput.trim());
+      if (res.success) {
+        setTursoUrl(tursoUrlInput.trim());
+        setTursoToken(tursoTokenInput.trim());
         setSyncResult({ type: 'success', message: res.message });
       } else {
         setSyncResult({ type: 'error', message: res.message });
@@ -246,6 +300,99 @@ function doPost(e) {
     navigator.clipboard.writeText(appsScriptCode);
     setCopiedScript(true);
     setTimeout(() => setCopiedScript(false), 2000);
+  };
+
+  const tursoSqlSchema = `-- SQLite / libSQL Database Setup Script for RUN System Vanguard CRM
+CREATE TABLE IF NOT EXISTS companies (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  industry TEXT,
+  email TEXT,
+  phone TEXT,
+  address TEXT,
+  status TEXT,
+  dateAdded TEXT
+);
+
+CREATE TABLE IF NOT EXISTS contacts (
+  id TEXT PRIMARY KEY,
+  companyId TEXT,
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  status TEXT,
+  role TEXT,
+  dateAdded TEXT
+);
+
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,
+  companyId TEXT,
+  name TEXT NOT NULL,
+  code TEXT,
+  budget REAL,
+  currency TEXT,
+  status TEXT,
+  startDate TEXT,
+  endDate TEXT,
+  description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS contracts (
+  id TEXT PRIMARY KEY,
+  projectId TEXT,
+  title TEXT NOT NULL,
+  contractNumber TEXT,
+  type TEXT,
+  value REAL,
+  currency TEXT,
+  status TEXT,
+  signDate TEXT,
+  startDate TEXT,
+  endDate TEXT,
+  stages TEXT
+);
+
+CREATE TABLE IF NOT EXISTS templates (
+  contractType TEXT PRIMARY KEY,
+  stages TEXT
+);
+
+CREATE TABLE IF NOT EXISTS deals (
+  id TEXT PRIMARY KEY,
+  companyId TEXT,
+  contactId TEXT,
+  title TEXT NOT NULL,
+  stage TEXT,
+  value REAL,
+  currency TEXT,
+  estimatedCloseDate TEXT,
+  description TEXT,
+  createdAt TEXT,
+  quotationItems TEXT,
+  quotationDate TEXT,
+  quotationExpiry TEXT,
+  quotationTerms TEXT
+);
+
+CREATE TABLE IF NOT EXISTS meetings (
+  id TEXT PRIMARY KEY,
+  companyId TEXT,
+  title TEXT NOT NULL,
+  date TEXT,
+  time TEXT,
+  type TEXT,
+  status TEXT,
+  summary TEXT,
+  actionItems TEXT,
+  attendees TEXT,
+  documents TEXT
+);`;
+
+  const copyTursoSchemaToClipboard = () => {
+    navigator.clipboard.writeText(tursoSqlSchema);
+    setCopiedTursoSchema(true);
+    setTimeout(() => setCopiedTursoSchema(false), 2000);
   };
 
   if (!isAuthenticated) {
