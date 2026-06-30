@@ -39,6 +39,7 @@ export const ContractMaster: React.FC<ContractMasterProps> = ({ onManageWorkflow
   const [signDate, setSignDate] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [formError, setFormError] = useState('');
 
   const handleOpenAddModal = () => {
     if (projects.length === 0) {
@@ -60,6 +61,7 @@ export const ContractMaster: React.FC<ContractMasterProps> = ({ onManageWorkflow
     setSignDate(new Date().toISOString().split('T')[0]);
     setStartDate(new Date().toISOString().split('T')[0]);
     setEndDate(new Date().toISOString().split('T')[0]);
+    setFormError('');
     setIsModalOpen(true);
   };
 
@@ -81,11 +83,28 @@ export const ContractMaster: React.FC<ContractMasterProps> = ({ onManageWorkflow
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingContract(null);
+    setFormError('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectId || !title || !contractNumber || !type || !startDate || !endDate) return;
+    setFormError('');
+
+    const missing: string[] = [];
+    if (!title.trim()) missing.push('Contract Title');
+    if (!contractNumber.trim()) missing.push('Contract Number / Reference');
+    if (!projectId) missing.push('Associated Master Project');
+    if (!type) missing.push('Contract Type');
+    if (!startDate) missing.push('Start Date');
+    if (!endDate) missing.push('Expiry Date');
+
+    if (missing.length > 0) {
+      setFormError(`Please fill in the following required fields: ${missing.join(', ')}`);
+      // Scroll modal body to top so user sees the error and title field
+      const modalBody = document.querySelector('.modal-body') as HTMLElement;
+      if (modalBody) modalBody.scrollTop = 0;
+      return;
+    }
 
     const contractData = {
       projectId,
@@ -381,6 +400,21 @@ export const ContractMaster: React.FC<ContractMasterProps> = ({ onManageWorkflow
             <form onSubmit={handleSubmit}>
               <div className="modal-body" style={{ maxHeight: '65vh' }}>
                 
+                {formError && (
+                  <div style={{
+                    background: 'rgba(239,68,68,0.1)',
+                    border: '1px solid rgba(239,68,68,0.4)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '0.75rem 1rem',
+                    color: '#f87171',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    marginBottom: '0.5rem',
+                  }}>
+                    ⚠️ {formError}
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label className="form-label">Contract Title *</label>
                   <input

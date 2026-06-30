@@ -862,11 +862,13 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Turso Integration State
   const [tursoUrl, setTursoUrlState] = useState<string>(() => {
     const val = localStorage.getItem('vanguard_turso_url');
-    return val !== null ? val : 'libsql://runs-vanguard-crm-aryoramandito.aws-ap-northeast-1.turso.io';
+    // Fall back to hardcoded default if missing OR empty string
+    return (val !== null && val.trim() !== '') ? val.trim() : 'libsql://runs-vanguard-crm-aryoramandito.aws-ap-northeast-1.turso.io';
   });
   const [tursoToken, setTursoTokenState] = useState<string>(() => {
     const val = localStorage.getItem('vanguard_turso_token');
-    return val !== null ? val : 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODI3OTg0MzAsImlkIjoiMDE5ZjE2MjUtYTQwMS03MzY4LWIwNTEtNGNkNGZiZDA4ZjU2Iiwia2lkIjoiN1ROMUFUclFnTGtiRDAxUzVRQUsyS1QxZXQ4cHZjLVd4bkJhUEN3UTdlbyIsInJpZCI6IjUxN2I0Yzg5LWNkMjEtNDZiNi05ODY1LWE3NTI0YzU0NmEwYiJ9.XVYu41CGLIYW5LvdMohufmfKmzRC798WyGmJYi8S7oRXzqC7J16zHR7chFNSkKeHR_uX4cTI8ASLVVl6ZO10Bg';
+    // Fall back to hardcoded default if missing OR empty string
+    return (val !== null && val.trim() !== '') ? val.trim() : 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODI3OTg0MzAsImlkIjoiMDE5ZjE2MjUtYTQwMS03MzY4LWIwNTEtNGNkNGZiZDA4ZjU2Iiwia2lkIjoiN1ROMUFUclFnTGtiRDAxUzVRQUsyS1QxZXQ4cHZjLVd4bkJhUEN3UTdlbyIsInJpZCI6IjUxN2I0Yzg5LWNkMjEtNDZiNi05ODY1LWE3NTI0YzU0NmEwYiJ9.XVYu41CGLIYW5LvdMohufmfKmzRC798WyGmJYi8S7oRXzqC7J16zHR7chFNSkKeHR_uX4cTI8ASLVVl6ZO10Bg';
   });
 
   const setTursoUrl = (url: string) => {
