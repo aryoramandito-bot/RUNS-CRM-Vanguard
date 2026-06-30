@@ -591,6 +591,64 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
                       );
                     })}
                   </div>
+
+                  {/* Column Summary Card */}
+                  <div style={{
+                    marginTop: 'auto',
+                    paddingTop: '0.6rem',
+                    borderTop: '1px solid var(--border-glass)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.25rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                      <span>Deals</span>
+                      <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{stageDeals.length}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                      <span>Total Value</span>
+                    </div>
+                    {(() => {
+                      const idrTotal = stageDeals.filter(d => d.currency === 'IDR').reduce((s, d) => s + d.value, 0);
+                      const usdTotal = stageDeals.filter(d => d.currency === 'USD').reduce((s, d) => s + d.value, 0);
+                      const hasIDR = idrTotal > 0;
+                      const hasUSD = usdTotal > 0;
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                          {hasIDR && (
+                            <div style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              color: stage === 'Closed Won' ? 'var(--success)' : stage === 'Closed Lost' ? 'var(--error)' : 'var(--accent-indigo)',
+                              textAlign: 'right',
+                              background: stage === 'Closed Won' ? 'rgba(16,185,129,0.07)' : stage === 'Closed Lost' ? 'rgba(239,68,68,0.07)' : 'rgba(99,102,241,0.07)',
+                              borderRadius: '4px',
+                              padding: '0.2rem 0.4rem'
+                            }}>
+                              {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(idrTotal)}
+                            </div>
+                          )}
+                          {hasUSD && (
+                            <div style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              color: 'var(--accent-cyan)',
+                              textAlign: 'right',
+                              background: 'rgba(34,211,238,0.07)',
+                              borderRadius: '4px',
+                              padding: '0.2rem 0.4rem'
+                            }}>
+                              {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(usdTotal)}
+                            </div>
+                          )}
+                          {!hasIDR && !hasUSD && (
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'right', padding: '0.2rem 0.4rem' }}>—</div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
                 </div>
               );
             })}

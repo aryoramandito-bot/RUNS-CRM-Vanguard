@@ -118,14 +118,13 @@ export const SalesDashboard: React.FC = () => {
     return ageDays > 30 && daysSinceMeeting > 14;
   });
 
-  // 4. Top Opportunities (normalized to IDR for comparison: 1 USD = 16k IDR)
-  const topDeals = [...activeDeals]
+  // 4. All Opportunities ranked by IDR-normalized value (1 USD = 16,000 IDR)
+  const topDeals = [...deals]
     .sort((a, b) => {
       const valA = a.currency === 'USD' ? a.value * 16000 : a.value;
       const valB = b.currency === 'USD' ? b.value * 16000 : b.value;
       return valB - valA;
-    })
-    .slice(0, 5);
+    });
 
   // Probability config slider handler
   const handleProbabilityChange = (stage: SalesDealStage, val: number) => {
@@ -379,25 +378,27 @@ export const SalesDashboard: React.FC = () => {
 
       {/* Top Open Opportunities Leaderboard */}
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
-          Top Active Opportunities (IDR-Normalized)
+        <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>All Sales Opportunities (IDR-Normalized Ranking)</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>{topDeals.length} deals total</span>
         </h3>
 
         {topDeals.length > 0 ? (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', maxHeight: '520px', overflowY: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
-              <thead>
+              <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-secondary)', zIndex: 1 }}>
                 <tr style={{ borderBottom: '1px solid var(--border-glass)', color: 'var(--text-secondary)' }}>
+                  <th style={{ padding: '0.5rem 0.5rem' }}>#</th>
                   <th style={{ padding: '0.5rem 0.75rem' }}>Opportunity Title</th>
                   <th style={{ padding: '0.5rem 0.75rem' }}>Client Company</th>
                   <th style={{ padding: '0.5rem 0.75rem' }}>Stage</th>
                   <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>Raw Value</th>
                   <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>Weighted Value</th>
-                  <th style={{ padding: '0.5rem 0.75rem' }}>Last Meeting Date</th>
+                  <th style={{ padding: '0.5rem 0.75rem' }}>Last Meeting</th>
                 </tr>
               </thead>
               <tbody>
-                {topDeals.map(d => {
+                {topDeals.map((d, idx) => {
                   const company = companies.find(c => c.id === d.companyId);
                   const probability = stageProbabilities[d.stage] ?? 0;
                   const weightedVal = d.value * (probability / 100);
@@ -406,20 +407,25 @@ export const SalesDashboard: React.FC = () => {
                   const sortedMeets = [...dealMeets].sort((a, b) => b.meetingDate.localeCompare(a.meetingDate));
                   const lastMeetStr = sortedMeets[0] ? formatDateDDMMMYY(sortedMeets[0].meetingDate) : '-';
 
+                  const isWon = d.stage === 'Closed Won';
+                  const isLost = d.stage === 'Closed Lost';
+                  const rowBg = isWon ? 'rgba(16,185,129,0.05)' : isLost ? 'rgba(239,68,68,0.04)' : 'transparent';
+
                   return (
-                    <tr key={d.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                    <tr key={d.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', background: rowBg }}>
+                      <td style={{ padding: '0.75rem 0.5rem', color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.7rem' }}>{idx + 1}</td>
                       <td style={{ padding: '0.75rem', fontWeight: 700 }}>{d.title}</td>
                       <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>
                         {company ? company.name : 'Unknown Company'}
                       </td>
                       <td style={{ padding: '0.75rem' }}>
-                        <span className={`badge badge-info`} style={{ fontSize: '0.65rem' }}>{d.stage}</span>
+                        <span className={`badge ${isWon ? 'badge-active' : isLost ? 'badge-inactive' : 'badge-info'}`} style={{ fontSize: '0.65rem' }}>{d.stage}</span>
                       </td>
                       <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700 }}>
                         {formatCurrency(d.value, d.currency)}
                       </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'right', color: 'var(--success)', fontWeight: 700 }}>
-                        {formatCurrency(weightedVal, d.currency)}
+                      <td style={{ padding: '0.75rem', textAlign: 'right', color: isWon ? 'var(--success)' : isLost ? 'var(--error)' : 'var(--success)', fontWeight: 700 }}>
+                        {isLost ? '—' : formatCurrency(weightedVal, d.currency)}
                       </td>
                       <td style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>
                         {lastMeetStr}
