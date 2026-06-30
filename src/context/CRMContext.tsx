@@ -36,7 +36,19 @@ interface CRMContextType {
   tursoToken: string;
   setTursoToken: (token: string) => void;
   syncFromTurso: () => Promise<{ success: boolean; message: string }>;
-  syncToTurso: (targetUrl?: string, targetToken?: string) => Promise<{ success: boolean; message: string }>;
+  syncToTurso: (
+    targetUrl?: string, 
+    targetToken?: string, 
+    overrides?: {
+      companies?: ClientCompany[];
+      contacts?: ClientContact[];
+      projects?: Project[];
+      contracts?: Contract[];
+      templates?: WorkflowTemplate[];
+      deals?: SalesDeal[];
+      meetings?: MeetingLog[];
+    }
+  ) => Promise<{ success: boolean; message: string }>;
   lastSyncTime: string;
   hasInitialized: boolean;
   syncError: string | null;
@@ -595,7 +607,7 @@ const cleanDatesInObject = <T,>(obj: T): T => {
 };
 
 export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [companies, setCompanies] = useState<ClientCompany[]>(() => {
+  const [companies, setCompaniesState] = useState<ClientCompany[]>(() => {
     const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
     if (hasDB) return [];
 
@@ -624,7 +636,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedCompanies);
   });
 
-  const [contacts, setContacts] = useState<ClientContact[]>(() => {
+  const [contacts, setContactsState] = useState<ClientContact[]>(() => {
     const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
     if (hasDB) return [];
 
@@ -655,7 +667,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedContacts);
   });
 
-  const [projects, setProjects] = useState<Project[]>(() => {
+  const [projects, setProjectsState] = useState<Project[]>(() => {
     const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
     if (hasDB) return [];
 
@@ -675,7 +687,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedProjects);
   });
 
-  const [contracts, setContracts] = useState<Contract[]>(() => {
+  const [contracts, setContractsState] = useState<Contract[]>(() => {
     const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
     if (hasDB) return [];
 
@@ -683,7 +695,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedContracts);
   });
 
-  const [templates, setTemplates] = useState<WorkflowTemplate[]>(() => {
+  const [templates, setTemplatesState] = useState<WorkflowTemplate[]>(() => {
     const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
     if (hasDB) return [];
 
@@ -691,7 +703,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(defaultTemplates);
   });
 
-  const [deals, setDeals] = useState<SalesDeal[]>(() => {
+  const [deals, setDealsState] = useState<SalesDeal[]>(() => {
     const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
     if (hasDB) return [];
 
@@ -699,13 +711,109 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedDeals);
   });
 
-  const [meetings, setMeetings] = useState<MeetingLog[]>(() => {
+  const [meetings, setMeetingsState] = useState<MeetingLog[]>(() => {
     const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
     if (hasDB) return [];
 
     const saved = localStorage.getItem('vanguard_meetings');
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedMeetings);
   });
+
+  const saveAndPushState = async (updates: {
+    companies?: ClientCompany[];
+    contacts?: ClientContact[];
+    projects?: Project[];
+    contracts?: Contract[];
+    templates?: WorkflowTemplate[];
+    deals?: SalesDeal[];
+    meetings?: MeetingLog[];
+  }) => {
+    if (!hasInitialized) return;
+    if (tursoUrl && tursoToken) {
+      await syncToTurso(tursoUrl, tursoToken, updates);
+    } else if (sheetUrl) {
+      const payload = {
+        companies: updates.companies || companies,
+        contacts: updates.contacts || contacts,
+        projects: updates.projects || projects,
+        contracts: updates.contracts || contracts,
+        templates: updates.templates || templates,
+        deals: updates.deals || deals,
+        meetings: updates.meetings || meetings,
+      };
+      setIsSyncing(true);
+      try {
+        await fetch(sheetUrl, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payload),
+          redirect: 'follow',
+        });
+        setIsSyncing(false);
+        updateTimestamp();
+      } catch (e) {
+        setIsSyncing(false);
+        console.error("Failed to push to Sheets:", e);
+      }
+    }
+  };
+
+  const setCompanies = (val: ClientCompany[] | ((prev: ClientCompany[]) => ClientCompany[])) => {
+    const next = typeof val === 'function' ? val(companies) : val;
+    setCompaniesState(next);
+    if (!skipAutoPushRef.current) {
+      saveAndPushState({ companies: next });
+    }
+  };
+
+  const setContacts = (val: ClientContact[] | ((prev: ClientContact[]) => ClientContact[])) => {
+    const next = typeof val === 'function' ? val(contacts) : val;
+    setContactsState(next);
+    if (!skipAutoPushRef.current) {
+      saveAndPushState({ contacts: next });
+    }
+  };
+
+  const setProjects = (val: Project[] | ((prev: Project[]) => Project[])) => {
+    const next = typeof val === 'function' ? val(projects) : val;
+    setProjectsState(next);
+    if (!skipAutoPushRef.current) {
+      saveAndPushState({ projects: next });
+    }
+  };
+
+  const setContracts = (val: Contract[] | ((prev: Contract[]) => Contract[])) => {
+    const next = typeof val === 'function' ? val(contracts) : val;
+    setContractsState(next);
+    if (!skipAutoPushRef.current) {
+      saveAndPushState({ contracts: next });
+    }
+  };
+
+  const setTemplates = (val: WorkflowTemplate[] | ((prev: WorkflowTemplate[]) => WorkflowTemplate[])) => {
+    const next = typeof val === 'function' ? val(templates) : val;
+    setTemplatesState(next);
+    if (!skipAutoPushRef.current) {
+      saveAndPushState({ templates: next });
+    }
+  };
+
+  const setDeals = (val: SalesDeal[] | ((prev: SalesDeal[]) => SalesDeal[])) => {
+    const next = typeof val === 'function' ? val(deals) : val;
+    setDealsState(next);
+    if (!skipAutoPushRef.current) {
+      saveAndPushState({ deals: next });
+    }
+  };
+
+  const setMeetings = (val: MeetingLog[] | ((prev: MeetingLog[]) => MeetingLog[])) => {
+    const next = typeof val === 'function' ? val(meetings) : val;
+    setMeetingsState(next);
+    if (!skipAutoPushRef.current) {
+      saveAndPushState({ meetings: next });
+    }
+  };
 
   const [stageProbabilities, setStageProbabilities] = useState<Record<SalesDealStage, number>>(() => {
     const saved = localStorage.getItem('vanguard_stage_probs');
@@ -1148,78 +1256,114 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Sync push to Turso SQLite
-  const syncToTurso = async (targetUrl = tursoUrl, targetToken = tursoToken): Promise<{ success: boolean; message: string }> => {
+  const syncToTurso = async (
+    targetUrl = tursoUrl, 
+    targetToken = tursoToken,
+    overrides?: {
+      companies?: ClientCompany[];
+      contacts?: ClientContact[];
+      projects?: Project[];
+      contracts?: Contract[];
+      templates?: WorkflowTemplate[];
+      deals?: SalesDeal[];
+      meetings?: MeetingLog[];
+    }
+  ): Promise<{ success: boolean; message: string }> => {
     const client = getTursoClient(targetUrl, targetToken);
     if (!client) return { success: false, message: 'Turso URL or Auth Token is not configured.' };
 
     setIsSyncing(true);
     try {
       const statements: any[] = [];
+      const shouldWriteAll = !overrides;
 
       // Companies
-      statements.push("DELETE FROM companies;");
-      companies.forEach(c => {
-        statements.push({
-          sql: "INSERT INTO companies (id, name, industry, email, phone, address, status, dateAdded) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
-          args: [c.id, c.name, c.industry, c.email, c.phone, c.address, c.status, c.dateAdded]
+      if (shouldWriteAll || overrides?.companies) {
+        const list = overrides?.companies || companies;
+        statements.push("DELETE FROM companies;");
+        list.forEach(c => {
+          statements.push({
+            sql: "INSERT INTO companies (id, name, industry, email, phone, address, status, dateAdded) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
+            args: [c.id, c.name, c.industry, c.email, c.phone, c.address, c.status, c.dateAdded]
+          });
         });
-      });
+      }
 
       // Contacts
-      statements.push("DELETE FROM contacts;");
-      contacts.forEach(c => {
-        statements.push({
-          sql: "INSERT INTO contacts (id, companyId, name, email, phone, status, role, dateAdded) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
-          args: [c.id, c.companyId, c.name, c.email, c.phone, c.status, c.role, c.dateAdded]
+      if (shouldWriteAll || overrides?.contacts) {
+        const list = overrides?.contacts || contacts;
+        statements.push("DELETE FROM contacts;");
+        list.forEach(c => {
+          statements.push({
+            sql: "INSERT INTO contacts (id, companyId, name, email, phone, status, role, dateAdded) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
+            args: [c.id, c.companyId, c.name, c.email, c.phone, c.status, c.role, c.dateAdded]
+          });
         });
-      });
+      }
 
       // Projects
-      statements.push("DELETE FROM projects;");
-      projects.forEach(p => {
-        statements.push({
-          sql: "INSERT INTO projects (id, companyId, name, code, budget, currency, status, startDate, endDate, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
-          args: [p.id, p.companyId, p.name, p.code, p.budget, p.currency, p.status, p.startDate, p.endDate, p.description]
+      if (shouldWriteAll || overrides?.projects) {
+        const list = overrides?.projects || projects;
+        statements.push("DELETE FROM projects;");
+        list.forEach(p => {
+          statements.push({
+            sql: "INSERT INTO projects (id, companyId, name, code, budget, currency, status, startDate, endDate, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+            args: [p.id, p.companyId, p.name, p.code, p.budget, p.currency, p.status, p.startDate, p.endDate, p.description]
+          });
         });
-      });
+      }
 
       // Contracts
-      statements.push("DELETE FROM contracts;");
-      contracts.forEach(c => {
-        statements.push({
-          sql: "INSERT INTO contracts (id, projectId, title, contractNumber, type, value, currency, status, signDate, startDate, endDate, stages) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
-          args: [c.id, c.projectId, c.title, c.contractNumber, c.type, c.value, c.currency, c.status, c.signDate, c.startDate, c.endDate, JSON.stringify(c.stages)]
+      if (shouldWriteAll || overrides?.contracts) {
+        const list = overrides?.contracts || contracts;
+        statements.push("DELETE FROM contracts;");
+        list.forEach(c => {
+          statements.push({
+            sql: "INSERT INTO contracts (id, projectId, title, contractNumber, type, value, currency, status, signDate, startDate, endDate, stages) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+            args: [c.id, c.projectId, c.title, c.contractNumber, c.type, c.value, c.currency, c.status, c.signDate, c.startDate, c.endDate, JSON.stringify(c.stages)]
+          });
         });
-      });
+      }
 
       // Templates
-      statements.push("DELETE FROM templates;");
-      templates.forEach(t => {
-        statements.push({
-          sql: "INSERT INTO templates (contractType, stages) VALUES (?, ?);",
-          args: [t.contractType, JSON.stringify(t.stages)]
+      if (shouldWriteAll || overrides?.templates) {
+        const list = overrides?.templates || templates;
+        statements.push("DELETE FROM templates;");
+        list.forEach(t => {
+          statements.push({
+            sql: "INSERT INTO templates (contractType, stages) VALUES (?, ?);",
+            args: [t.contractType, JSON.stringify(t.stages)]
+          });
         });
-      });
+      }
 
       // Deals
-      statements.push("DELETE FROM deals;");
-      deals.forEach(d => {
-        statements.push({
-          sql: "INSERT INTO deals (id, companyId, contactId, title, stage, value, currency, estimatedCloseDate, description, createdAt, quotationItems, quotationDate, quotationExpiry, quotationTerms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
-          args: [d.id, d.companyId, d.contactId, d.title, d.stage, d.value, d.currency, d.estimatedCloseDate, d.description, d.createdAt, JSON.stringify(d.quotationItems || []), d.quotationDate || "", d.quotationExpiry || "", d.quotationTerms || ""]
+      if (shouldWriteAll || overrides?.deals) {
+        const list = overrides?.deals || deals;
+        statements.push("DELETE FROM deals;");
+        list.forEach(d => {
+          statements.push({
+            sql: "INSERT INTO deals (id, companyId, contactId, title, stage, value, currency, estimatedCloseDate, description, createdAt, quotationItems, quotationDate, quotationExpiry, quotationTerms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+            args: [d.id, d.companyId, d.contactId, d.title, d.stage, d.value, d.currency, d.estimatedCloseDate, d.description, d.createdAt, JSON.stringify(d.quotationItems || []), d.quotationDate || "", d.quotationExpiry || "", d.quotationTerms || ""]
+          });
         });
-      });
+      }
 
       // Meetings
-      statements.push("DELETE FROM meetings;");
-      meetings.forEach(m => {
-        statements.push({
-          sql: "INSERT INTO meetings (id, dealId, meetingDate, title, attendees, notes, documents) VALUES (?, ?, ?, ?, ?, ?, ?);",
-          args: [m.id, m.dealId, m.meetingDate, m.title, JSON.stringify(m.attendees || []), m.notes || "", JSON.stringify(m.documents || [])]
+      if (shouldWriteAll || overrides?.meetings) {
+        const list = overrides?.meetings || meetings;
+        statements.push("DELETE FROM meetings;");
+        list.forEach(m => {
+          statements.push({
+            sql: "INSERT INTO meetings (id, dealId, meetingDate, title, attendees, notes, documents) VALUES (?, ?, ?, ?, ?, ?, ?);",
+            args: [m.id, m.dealId, m.meetingDate, m.title, JSON.stringify(m.attendees || []), m.notes || "", JSON.stringify(m.documents || [])]
+          });
         });
-      });
+      }
 
-      await client.batch(statements, "write");
+      if (statements.length > 0) {
+        await client.batch(statements, "write");
+      }
       setIsSyncing(false);
       updateTimestamp();
       return { success: true, message: 'Successfully pushed database state to Turso SQLite!' };
@@ -1229,26 +1373,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Debounced auto-save effect
-  useEffect(() => {
-    if (!hasInitialized || !autoSync || skipAutoPushRef.current) return;
-    if (!tursoUrl && !sheetUrl) return;
 
-    const timer = setTimeout(async () => {
-      console.log('Debounced auto-saving changes...');
-      try {
-        if (tursoUrl && tursoToken) {
-          await syncToTurso();
-        } else if (sheetUrl) {
-          await syncToSheets();
-        }
-      } catch (e) {
-        console.error('Auto-sync push failed:', e);
-      }
-    }, 1000); // 1 second delay of inactivity
-
-    return () => clearTimeout(timer);
-  }, [companies, contacts, projects, contracts, templates, deals, meetings, autoSync, hasInitialized]);
 
   // Periodic background sync & Window focus sync
   useEffect(() => {
