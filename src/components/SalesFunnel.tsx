@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { SalesDashboard } from './SalesDashboard';
 import type { SalesDeal, SalesDealStage, QuotationItem, Currency } from '../types/crm';

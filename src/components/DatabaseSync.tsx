@@ -8,8 +8,7 @@ import {
   Check,
   AlertTriangle,
   Info,
-  CheckCircle,
-  Globe
+  CheckCircle
 } from 'lucide-react';
 
 export const DatabaseSync: React.FC = () => {
@@ -30,6 +29,7 @@ export const DatabaseSync: React.FC = () => {
   const [tursoUrlInput, setTursoUrlInput] = useState(tursoUrl);
   const [tursoTokenInput, setTursoTokenInput] = useState(tursoToken);
   const [copiedTursoSchema, setCopiedTursoSchema] = useState(false);
+  const [rightPanelTab, setRightPanelTab] = useState<'turso' | 'sheets'>('turso');
 
   // Password Protection States
   const [passwordInput, setPasswordInput] = useState('');
@@ -436,7 +436,7 @@ CREATE TABLE IF NOT EXISTS meetings (
       <div>
         <h2 style={{ fontSize: '1.8rem', fontWeight: 800 }}>Database Integration</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.2rem' }}>
-          Connect RUN System Vanguard to a Google Sheet spreadsheet for a free, persistent, and collaborative cloud database.
+          Connect RUN System Vanguard to a serverless SQLite database (Turso) or a Google Sheets spreadsheet for cloud data persistence.
         </p>
       </div>
 
@@ -445,7 +445,72 @@ CREATE TABLE IF NOT EXISTS meetings (
         {/* Left Side: Setup & Settings */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
-          {/* Settings Card */}
+          {/* Turso Database Settings Card */}
+          <div className="glass-panel" style={{ padding: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Database size={18} className="gradient-text" /> Turso SQLite Database Settings
+            </h3>
+            
+            <form onSubmit={handleSaveTurso} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Turso Database URL (libSQL / HTTP)</label>
+                <input
+                  type="text"
+                  placeholder="libsql://your-db-name.turso.io"
+                  value={tursoUrlInput}
+                  onChange={e => setTursoUrlInput(e.target.value)}
+                  className="form-input"
+                  style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
+                />
+              </div>
+              
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Database Auth Token</label>
+                <input
+                  type="password"
+                  placeholder="Enter Turso auth token"
+                  value={tursoTokenInput}
+                  onChange={e => setTursoTokenInput(e.target.value)}
+                  className="form-input"
+                  style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button 
+                  type="submit" 
+                  className="btn btn-secondary" 
+                  disabled={!tursoUrlInput || !tursoTokenInput || isSyncing}
+                  style={{ padding: '0.55rem 1rem', fontSize: '0.8rem' }}
+                >
+                  Save Config
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  onClick={handleTursoPush}
+                  disabled={!tursoUrlInput || !tursoTokenInput || isSyncing || !hasPulled}
+                  style={{ gap: '0.35rem', padding: '0.55rem 1rem', fontSize: '0.8rem', opacity: (!tursoUrlInput || !tursoTokenInput || isSyncing || !hasPulled) ? 0.5 : 1 }}
+                  title={!hasPulled ? "Please perform a Pull operation first to link database state" : "Push current database to Turso"}
+                >
+                  <ArrowUpCircle size={15} /> 
+                  {isSyncing ? 'Syncing...' : 'Push to Turso'}
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={handleTursoPull}
+                  disabled={!tursoUrl || !tursoToken || isSyncing}
+                  style={{ gap: '0.35rem', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)', padding: '0.55rem 1rem', fontSize: '0.8rem' }}
+                >
+                  <ArrowDownCircle size={15} /> 
+                  {isSyncing ? 'Syncing...' : 'Pull from Turso'}
+                </button>
+              </div>
+            </form>
+          </div>
+          
+          {/* Google Sheets Sync Settings Card */}
           <div className="glass-panel" style={{ padding: '1.5rem' }}>
             <h3 style={{ fontSize: '1.1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Database size={18} className="gradient-text" /> Google Sheets Sync Settings
@@ -479,7 +544,7 @@ CREATE TABLE IF NOT EXISTS meetings (
                   onClick={handlePush}
                   disabled={!urlInput || isSyncing || !hasPulled}
                   style={{ gap: '0.35rem', padding: '0.55rem 1rem', fontSize: '0.8rem', opacity: (!urlInput || isSyncing || !hasPulled) ? 0.5 : 1 }}
-                  title={!hasPulled ? "Please perform a Pull from Sheets first to link database state" : "Push current state to sheet"}
+                  title={!hasPulled ? "Please perform a Pull operation first to link database state" : "Push current database to Google Sheets"}
                 >
                   <ArrowUpCircle size={15} /> 
                   {isSyncing ? 'Syncing...' : 'Push to Sheets'}
@@ -500,7 +565,7 @@ CREATE TABLE IF NOT EXISTS meetings (
             {!hasPulled && (
               <div className="glass-panel" style={{ padding: '0.75rem 1rem', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid var(--accent-amber)', borderRadius: '8px', color: 'var(--accent-amber)', fontSize: '0.75rem', marginTop: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-                <span><strong>Security Lock:</strong> You must click <strong>Pull from Sheets</strong> first to link this device's cache to the cloud before you can push updates.</span>
+                <span><strong>Security Lock:</strong> You must click <strong>Pull</strong> first to link this device's cache to the cloud before you can push updates.</span>
               </div>
             )}
 
@@ -514,7 +579,7 @@ CREATE TABLE IF NOT EXISTS meetings (
             }}>
               <div>
                 <span style={{ fontSize: '0.9rem', fontWeight: 700, display: 'block' }}>Real-time Auto-Sync</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Automatically save changes to Google Sheets in the background.</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Automatically save changes to your active database in the background.</span>
               </div>
               <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '46px', height: '24px' }}>
                 <input
@@ -569,74 +634,150 @@ CREATE TABLE IF NOT EXISTS meetings (
               </div>
             )}
           </div>
-
-          {/* Setup Guide Card */}
-          <div className="glass-panel" style={{ padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Globe size={18} className="gradient-text" /> 9-Step Google Sheets Database Setup
-            </h3>
-            <ol style={{ paddingLeft: '1.2rem', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.75rem', lineHeight: 1.45 }}>
-              <li>Create a new, empty spreadsheet at <strong>Google Sheets</strong>.</li>
-              <li>Open <strong>Extensions &gt; Apps Script</strong> from the top menu.</li>
-              <li>Clear any code in the editor, and click the <strong>Copy Script Code</strong> button on the right of this page.</li>
-              <li>Paste the script code into the Apps Script editor and click the Save disk icon.</li>
-              <li>Click the blue <strong>Deploy &gt; New Deployment</strong> button (top right).</li>
-              <li>Click the gear icon next to "Select type", choose <strong>Web App</strong>.</li>
-              <li>Configure:
-                <ul style={{ paddingLeft: '1.2rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                  <li>Execute as: <strong>Me (your email)</strong></li>
-                  <li>Who has access: <strong>Anyone</strong> (this keeps it free & simple to access without OAuth redirects)</li>
-                </ul>
-              </li>
-              <li>Click <strong>Deploy</strong>. Authorize the Google permissions popups (if prompted, click "Advanced" and then "Go to ... (unsafe)").</li>
-              <li>Copy the generated <strong>Web App URL</strong>, paste it into the URL field above, and click <strong>Push to Sheets</strong> to populate the tables!</li>
-            </ol>
-          </div>
-
         </div>
 
-        {/* Right Side: Apps Script Code Copy Block */}
+        {/* Right Side: Setup Instructions & Code Copy Block */}
         <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
-            <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Google Apps Script Code</span>
-            <button 
-              className="btn btn-secondary" 
-              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', gap: '0.35rem' }}
-              onClick={copyToClipboard}
+          
+          {/* Tab Switcher */}
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', gap: '1rem' }}>
+            <button
+              onClick={() => setRightPanelTab('turso')}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: rightPanelTab === 'turso' ? 'var(--accent-indigo)' : 'var(--text-secondary)',
+                borderBottom: rightPanelTab === 'turso' ? '2px solid var(--accent-indigo)' : 'none',
+                paddingBottom: '0.5rem',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer'
+              }}
             >
-              {copiedScript ? (
-                <>
-                  <Check size={13} style={{ color: 'var(--success)' }} /> Copied!
-                </>
-              ) : (
-                <>
-                  <Copy size={13} /> Copy Code
-                </>
-              )}
+              Turso SQLite Setup
+            </button>
+            <button
+              onClick={() => setRightPanelTab('sheets')}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: rightPanelTab === 'sheets' ? 'var(--accent-indigo)' : 'var(--text-secondary)',
+                borderBottom: rightPanelTab === 'sheets' ? '2px solid var(--accent-indigo)' : 'none',
+                paddingBottom: '0.5rem',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer'
+              }}
+            >
+              Google Sheets Setup
             </button>
           </div>
 
-          <pre 
-            style={{ 
-              background: 'rgba(0,0,0,0.3)', 
-              padding: '1rem', 
-              borderRadius: 'var(--radius-sm)', 
-              fontSize: '0.7rem', 
-              fontFamily: 'monospace',
-              color: 'var(--text-secondary)',
-              maxHeight: '400px',
-              overflow: 'auto',
-              border: '1px solid var(--border-glass)',
-              whiteSpace: 'pre'
-            }}
-          >
-            {appsScriptCode}
-          </pre>
+          {rightPanelTab === 'turso' ? (
+            <>
+              <div>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700 }}>Turso SQLite Database Setup</h4>
+                <ol style={{ paddingLeft: '1.2rem', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem', lineHeight: 1.45 }}>
+                  <li>Create a free account at <strong>turso.tech</strong>.</li>
+                  <li>Create a database called <code>vanguard-crm</code> via CLI or dashboard.</li>
+                  <li>Copy the SQL setup script below and execute it inside the Turso SQL Editor to build the schema tables.</li>
+                  <li>Get your DB URL (<code>libsql://...</code>) and generate a new Auth Token.</li>
+                  <li>Paste the credentials on the left, and click <strong>Push to Turso</strong> to seed your database!</li>
+                </ol>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', marginTop: '0.5rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>Turso SQL Setup Schema</span>
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', gap: '0.3rem' }}
+                  onClick={copyTursoSchemaToClipboard}
+                >
+                  {copiedTursoSchema ? (
+                    <>
+                      <Check size={12} style={{ color: 'var(--success)' }} /> Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} /> Copy SQL
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <pre 
+                style={{ 
+                  background: 'rgba(0,0,0,0.3)', 
+                  padding: '0.75rem', 
+                  borderRadius: 'var(--radius-sm)', 
+                  fontSize: '0.65rem', 
+                  fontFamily: 'monospace',
+                  color: 'var(--text-secondary)',
+                  maxHeight: '220px',
+                  overflow: 'auto',
+                  border: '1px solid var(--border-glass)',
+                  whiteSpace: 'pre'
+                }}
+              >
+                {tursoSqlSchema}
+              </pre>
+            </>
+          ) : (
+            <>
+              <div>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700 }}>Google Sheets Spreadsheet Setup</h4>
+                <ol style={{ paddingLeft: '1.2rem', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem', lineHeight: 1.45 }}>
+                  <li>Create a new spreadsheet on Google Sheets.</li>
+                  <li>Open <strong>Extensions &gt; Apps Script</strong>.</li>
+                  <li>Copy the Google Apps Script code below and paste it into the script editor.</li>
+                  <li>Click <strong>Deploy &gt; New Deployment</strong>, choose type <strong>Web App</strong>.</li>
+                  <li>Configure <strong>Execute as: Me</strong> and <strong>Who has access: Anyone</strong>.</li>
+                  <li>Authorize the script permissions and copy the generated Web App URL.</li>
+                </ol>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', marginTop: '0.5rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>Apps Script JavaScript Code</span>
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', gap: '0.3rem' }}
+                  onClick={copyToClipboard}
+                >
+                  {copiedScript ? (
+                    <>
+                      <Check size={12} style={{ color: 'var(--success)' }} /> Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} /> Copy Code
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <pre 
+                style={{ 
+                  background: 'rgba(0,0,0,0.3)', 
+                  padding: '0.75rem', 
+                  borderRadius: 'var(--radius-sm)', 
+                  fontSize: '0.65rem', 
+                  fontFamily: 'monospace',
+                  color: 'var(--text-secondary)',
+                  maxHeight: '220px',
+                  overflow: 'auto',
+                  border: '1px solid var(--border-glass)',
+                  whiteSpace: 'pre'
+                }}
+              >
+                {appsScriptCode}
+              </pre>
+            </>
+          )}
 
           <div style={{ padding: '0.75rem', background: 'rgba(6, 182, 212, 0.05)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(6, 182, 212, 0.15)', fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
             <Info size={16} style={{ color: 'var(--accent-cyan)', flexShrink: 0, marginTop: '0.1rem' }} />
             <p style={{ lineHeight: 1.4 }}>
-              <strong>Collaborative Sync:</strong> Since the state syncs with the sheet, you can share the Apps Script URL with your team. Anyone pasting the URL will pull the same database state!
+              <strong>Hybrid Core:</strong> You can configure both Turso and Google Sheets. Turso is optimal for blazing-fast cloud performance. Google Sheets works perfectly as a secondary manual backup export tool!
             </p>
           </div>
         </div>

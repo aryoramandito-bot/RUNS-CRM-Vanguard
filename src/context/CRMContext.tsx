@@ -881,6 +881,18 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         resJson = { success: true };
       }
 
+      setIsSyncing(false);
+      if (resJson.success) {
+        return { success: true, message: 'Successfully pushed database state to Google Sheets!' };
+      } else {
+        return { success: false, message: 'Apps Script reported failure writing to sheets.' };
+      }
+    } catch (error: any) {
+      setIsSyncing(false);
+      return { success: false, message: `Failed to push to Google Sheets: ${error.message}` };
+    }
+  };
+
   // Sync pull from Turso SQLite
   const syncFromTurso = async (): Promise<{ success: boolean; message: string }> => {
     const client = getTursoClient();
@@ -915,7 +927,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         email: c.email ? String(c.email) : '',
         phone: c.phone ? String(c.phone) : '',
         address: c.address ? String(c.address) : '',
-        status: c.status ? String(c.status) : 'Active',
+        status: c.status ? String(c.status) as any : 'Active',
         dateAdded: c.dateAdded ? String(c.dateAdded) : new Date().toISOString()
       }));
 
@@ -925,7 +937,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         name: String(c.name),
         email: c.email ? String(c.email) : '',
         phone: c.phone ? String(c.phone) : '',
-        status: c.status ? String(c.status) : 'Active',
+        status: c.status ? String(c.status) as any : 'Active',
         role: c.role ? String(c.role) : '',
         dateAdded: c.dateAdded ? String(c.dateAdded) : new Date().toISOString()
       }));
@@ -936,8 +948,8 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         name: String(p.name),
         code: p.code ? String(p.code) : '',
         budget: Number(p.budget) || 0,
-        currency: p.currency ? String(p.currency) : 'IDR',
-        status: p.status ? String(p.status) : 'Planning',
+        currency: p.currency ? String(p.currency) as any : 'IDR',
+        status: p.status ? String(p.status) as any : 'Planning',
         startDate: p.startDate ? String(p.startDate) : '',
         endDate: p.endDate ? String(p.endDate) : '',
         description: p.description ? String(p.description) : ''
@@ -959,8 +971,8 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           contractNumber: c.contractNumber ? String(c.contractNumber) : '',
           type: c.type ? String(c.type) : 'Fixed Price',
           value: Number(c.value) || 0,
-          currency: c.currency ? String(c.currency) : 'IDR',
-          status: c.status ? String(c.status) : 'Active',
+          currency: c.currency ? String(c.currency) as any : 'IDR',
+          status: c.status ? String(c.status) as any : 'Active',
           signDate: c.signDate ? String(c.signDate) : '',
           startDate: c.startDate ? String(c.startDate) : '',
           endDate: c.endDate ? String(c.endDate) : '',
@@ -997,9 +1009,9 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           companyId: String(d.companyId),
           contactId: String(d.contactId),
           title: String(d.title),
-          stage: String(d.stage) as SalesDealStage,
+          stage: String(d.stage) as any,
           value: Number(d.value) || 0,
-          currency: d.currency ? String(d.currency) : 'IDR',
+          currency: d.currency ? String(d.currency) as any : 'IDR',
           estimatedCloseDate: d.estimatedCloseDate ? String(d.estimatedCloseDate) : '',
           description: d.description ? String(d.description) : '',
           createdAt: d.createdAt ? String(d.createdAt) : new Date().toISOString(),
@@ -1029,14 +1041,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         return {
           id: String(m.id),
-          companyId: String(m.companyId),
+          dealId: String(m.dealId),
+          meetingDate: String(m.meetingDate),
           title: String(m.title),
-          date: String(m.date),
-          time: String(m.time),
-          type: String(m.type) as any,
-          status: String(m.status) as any,
-          summary: m.summary ? String(m.summary) : '',
-          actionItems: m.actionItems ? String(m.actionItems) : '',
+          notes: m.notes ? String(m.notes) : '',
           attendees: parsedAttendees,
           documents: parsedDocuments
         };
@@ -1133,8 +1141,8 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       statements.push("DELETE FROM meetings;");
       meetings.forEach(m => {
         statements.push({
-          sql: "INSERT INTO meetings (id, companyId, title, date, time, type, status, summary, actionItems, attendees, documents) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
-          args: [m.id, m.companyId, m.title, m.date, m.time, m.type, m.status, m.summary || "", m.actionItems || "", JSON.stringify(m.attendees || []), JSON.stringify(m.documents || [])]
+          sql: "INSERT INTO meetings (id, dealId, meetingDate, title, attendees, notes, documents) VALUES (?, ?, ?, ?, ?, ?, ?);",
+          args: [m.id, m.dealId, m.meetingDate, m.title, JSON.stringify(m.attendees || []), m.notes || "", JSON.stringify(m.documents || [])]
         });
       });
 
