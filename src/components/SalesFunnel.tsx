@@ -13,7 +13,13 @@ import {
   FolderPlus, 
   Clock, 
   FileText, 
-  Printer
+  Printer,
+  Zap,
+  Filter,
+  FileCheck,
+  Handshake,
+  Trophy,
+  XCircle
 } from 'lucide-react';
 
 interface SalesFunnelProps {
@@ -434,6 +440,52 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
         </div>
       </div>
 
+      {/* Stage Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '0.25rem' }}>
+        {stages.map(stage => {
+          const stageAllDeals = deals.filter(d => d.stage === stage);
+          const idrTotal = stageAllDeals.filter(d => d.currency === 'IDR').reduce((s, d) => s + d.value, 0);
+          const usdTotal = stageAllDeals.filter(d => d.currency === 'USD').reduce((s, d) => s + d.value, 0);
+
+          const stageConfig: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
+            'Lead':          { icon: <Zap size={18} />,       color: 'var(--text-secondary)',  bg: 'rgba(255,255,255,0.05)' },
+            'Qualification': { icon: <Filter size={18} />,    color: '#a78bfa',                bg: 'rgba(167,139,250,0.1)' },
+            'Proposal':      { icon: <FileCheck size={18} />, color: 'var(--accent-indigo)',   bg: 'rgba(99,102,241,0.1)' },
+            'Negotiation':   { icon: <Handshake size={18} />, color: '#f59e0b',                bg: 'rgba(245,158,11,0.1)' },
+            'Closed Won':    { icon: <Trophy size={18} />,    color: 'var(--success)',         bg: 'rgba(16,185,129,0.1)' },
+            'Closed Lost':   { icon: <XCircle size={18} />,  color: 'var(--error)',           bg: 'rgba(239,68,68,0.1)' },
+          };
+          const cfg = stageConfig[stage];
+
+          return (
+            <div key={stage} className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              <div style={{ padding: '0.45rem', borderRadius: '10px', background: cfg.bg, color: cfg.color, flexShrink: 0 }}>
+                {cfg.icon}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {stage}
+                  <span style={{ marginLeft: '0.4rem', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0.05rem 0.35rem', fontSize: '0.62rem', fontWeight: 700 }}>
+                    {stageAllDeals.length}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '0.15rem', color: cfg.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {idrTotal > 0 ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(idrTotal) : (usdTotal === 0 ? '—' : '')}
+                </div>
+                {usdTotal > 0 && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', marginTop: '0.05rem', fontWeight: 700 }}>
+                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(usdTotal)}
+                  </div>
+                )}
+                {idrTotal === 0 && usdTotal === 0 && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.05rem' }}>$0.00</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Main workspace layout */}
       <div className="funnel-layout-grid" style={{ display: 'grid', gridTemplateColumns: selectedDealId ? '1.5fr 1fr' : '1fr', gap: '1.5rem', flexGrow: 1, alignItems: 'stretch' }}>
         
@@ -591,64 +643,6 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
                       );
                     })}
                   </div>
-
-                  {/* Column Summary Card */}
-                  <div style={{
-                    marginTop: 'auto',
-                    paddingTop: '0.6rem',
-                    borderTop: '1px solid var(--border-glass)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.25rem'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                      <span>Deals</span>
-                      <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{stageDeals.length}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                      <span>Total Value</span>
-                    </div>
-                    {(() => {
-                      const idrTotal = stageDeals.filter(d => d.currency === 'IDR').reduce((s, d) => s + d.value, 0);
-                      const usdTotal = stageDeals.filter(d => d.currency === 'USD').reduce((s, d) => s + d.value, 0);
-                      const hasIDR = idrTotal > 0;
-                      const hasUSD = usdTotal > 0;
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                          {hasIDR && (
-                            <div style={{
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              color: stage === 'Closed Won' ? 'var(--success)' : stage === 'Closed Lost' ? 'var(--error)' : 'var(--accent-indigo)',
-                              textAlign: 'right',
-                              background: stage === 'Closed Won' ? 'rgba(16,185,129,0.07)' : stage === 'Closed Lost' ? 'rgba(239,68,68,0.07)' : 'rgba(99,102,241,0.07)',
-                              borderRadius: '4px',
-                              padding: '0.2rem 0.4rem'
-                            }}>
-                              {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(idrTotal)}
-                            </div>
-                          )}
-                          {hasUSD && (
-                            <div style={{
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              color: 'var(--accent-cyan)',
-                              textAlign: 'right',
-                              background: 'rgba(34,211,238,0.07)',
-                              borderRadius: '4px',
-                              padding: '0.2rem 0.4rem'
-                            }}>
-                              {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(usdTotal)}
-                            </div>
-                          )}
-                          {!hasIDR && !hasUSD && (
-                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'right', padding: '0.2rem 0.4rem' }}>—</div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-
                 </div>
               );
             })}
