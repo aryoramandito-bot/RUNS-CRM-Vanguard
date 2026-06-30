@@ -746,7 +746,6 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deals?: SalesDeal[];
     meetings?: MeetingLog[];
   }) => {
-    if (!hasInitialized) return;
     if (tursoUrl && tursoToken) {
       await syncToTurso(tursoUrl, tursoToken, updates);
     } else if (sheetUrl) {
