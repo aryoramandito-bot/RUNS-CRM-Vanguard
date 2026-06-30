@@ -145,6 +145,23 @@ const defaultTemplates: WorkflowTemplate[] = [
       { name: 'Final Project Report & Handover', description: 'Compile timesheet summaries and close project', category: 'Completed', relativeDays: 60 },
     ],
   },
+  {
+    contractType: 'Quarterly Managed Service',
+    stages: [
+      { name: 'Initial Briefing & Drafting', description: 'Gather requirements and draft contract SOW', category: 'Drafting', relativeDays: 5 },
+      { name: 'Legal & Procurement Review', description: 'Internal and external compliance review', category: 'Drafting', relativeDays: 10 },
+      { name: 'Contract Signing', description: 'Formal signing by both stakeholders', category: 'Signing', relativeDays: 15 },
+      { name: 'Q1 Billing Invoice', description: 'Issue Q1 Billing Invoice', category: 'Billing', relativeDays: 180 },
+      { name: 'Q1 Billing Invoice Collection', description: 'Q1 Billing Invoice Collection', category: 'Collection', relativeDays: 195 },
+      { name: 'Q2 Billing Invoice', description: 'Issue Q2 Billing Invoice', category: 'Billing', relativeDays: 270 },
+      { name: 'Q2 Billing Invoice Collection', description: 'Q2 Billing Invoice Collection', category: 'Collection', relativeDays: 285 },
+      { name: 'Q3 Billing Invoice', description: 'Issue Q3 Billing Invoice', category: 'Billing', relativeDays: 360 },
+      { name: 'Q3 Billing Invoice Collection', description: 'Q3 Billing Invoice Collection', category: 'Collection', relativeDays: 375 },
+      { name: 'Q4 Billing Invoice', description: 'Issue Q4 Billing Invoice', category: 'Billing', relativeDays: 450 },
+      { name: 'Q4 Billing Invoice Collection', description: 'Q4 Billing Invoice Collection', category: 'Collection', relativeDays: 465 },
+      { name: 'Final Deliverable & Project Closure', description: 'Laporan ATS & BA Penyelesaian Pekerjaan Managed Service ATS', category: 'Execution', relativeDays: 375 },
+    ],
+  },
 ];
 
 const seedCompanies: ClientCompany[] = [
