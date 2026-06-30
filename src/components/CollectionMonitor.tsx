@@ -64,7 +64,7 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
     const cust = p ? companies.find(comp => comp.id === p.companyId) : null;
     
     c.stages.forEach(st => {
-      if (st.category === 'Billing' || st.category === 'Collection') {
+      if ((st.category === 'Billing' || st.category === 'Collection') && st.billingAmount && st.billingAmount > 0) {
         milestones.push({
           contractId: c.id,
           contractTitle: c.title,
