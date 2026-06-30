@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { 
   Database, 
@@ -34,9 +34,7 @@ export const DatabaseSync: React.FC = () => {
   // Password Protection States
   const [passwordInput, setPasswordInput] = useState('');
   const [passError, setPassError] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return sessionStorage.getItem('vanguard_sync_authed') === 'true';
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const [hasPulled, setHasPulled] = useState(() => {
     return localStorage.getItem('vanguard_has_pulled') === 'true';
@@ -46,11 +44,40 @@ export const DatabaseSync: React.FC = () => {
     e.preventDefault();
     if (passwordInput === '12345') {
       setIsAuthenticated(true);
-      sessionStorage.setItem('vanguard_sync_authed', 'true');
     } else {
       setPassError('Incorrect password. Access denied.');
     }
   };
+
+  // Idle inactivity lock timer (5 minutes timeout)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let timeoutId: number;
+
+    const resetTimer = () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        setIsAuthenticated(false);
+        setPasswordInput('');
+        setSyncResult({ type: 'error', message: 'Session locked due to inactivity. Please enter password again.' });
+      }, 5 * 60 * 1000); // 5 minutes inactivity timeout
+    };
+
+    resetTimer();
+
+    const events = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [isAuthenticated]);
 
   const handleSaveUrl = (e: React.FormEvent) => {
     e.preventDefault();
