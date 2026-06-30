@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type {
   ClientCompany,
   ClientContact,
@@ -776,60 +776,47 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Write-through wrappers — always push to DB immediately on any CRUD mutation
   const setCompanies = (val: ClientCompany[] | ((prev: ClientCompany[]) => ClientCompany[])) => {
     const next = typeof val === 'function' ? val(companies) : val;
     setCompaniesState(next);
-    if (!skipAutoPushRef.current) {
-      saveAndPushState({ companies: next });
-    }
+    saveAndPushState({ companies: next });
   };
 
   const setContacts = (val: ClientContact[] | ((prev: ClientContact[]) => ClientContact[])) => {
     const next = typeof val === 'function' ? val(contacts) : val;
     setContactsState(next);
-    if (!skipAutoPushRef.current) {
-      saveAndPushState({ contacts: next });
-    }
+    saveAndPushState({ contacts: next });
   };
 
   const setProjects = (val: Project[] | ((prev: Project[]) => Project[])) => {
     const next = typeof val === 'function' ? val(projects) : val;
     setProjectsState(next);
-    if (!skipAutoPushRef.current) {
-      saveAndPushState({ projects: next });
-    }
+    saveAndPushState({ projects: next });
   };
 
   const setContracts = (val: Contract[] | ((prev: Contract[]) => Contract[])) => {
     const next = typeof val === 'function' ? val(contracts) : val;
     setContractsState(next);
-    if (!skipAutoPushRef.current) {
-      saveAndPushState({ contracts: next });
-    }
+    saveAndPushState({ contracts: next });
   };
 
   const setTemplates = (val: WorkflowTemplate[] | ((prev: WorkflowTemplate[]) => WorkflowTemplate[])) => {
     const next = typeof val === 'function' ? val(templates) : val;
     setTemplatesState(next);
-    if (!skipAutoPushRef.current) {
-      saveAndPushState({ templates: next });
-    }
+    saveAndPushState({ templates: next });
   };
 
   const setDeals = (val: SalesDeal[] | ((prev: SalesDeal[]) => SalesDeal[])) => {
     const next = typeof val === 'function' ? val(deals) : val;
     setDealsState(next);
-    if (!skipAutoPushRef.current) {
-      saveAndPushState({ deals: next });
-    }
+    saveAndPushState({ deals: next });
   };
 
   const setMeetings = (val: MeetingLog[] | ((prev: MeetingLog[]) => MeetingLog[])) => {
     const next = typeof val === 'function' ? val(meetings) : val;
     setMeetingsState(next);
-    if (!skipAutoPushRef.current) {
-      saveAndPushState({ meetings: next });
-    }
+    saveAndPushState({ meetings: next });
   };
 
   const [stageProbabilities, setStageProbabilities] = useState<Record<SalesDealStage, number>>(() => {
@@ -865,7 +852,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('vanguard_auto_sync', val ? 'true' : 'false');
   };
 
-  const skipAutoPushRef = useRef(false);
+
 
   const setSheetUrl = (url: string) => {
     setSheetUrlState(url);
@@ -1016,21 +1003,17 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const data = await response.json();
       const cleanData = cleanDatesInObject(data);
       
-      // Update local states
-      skipAutoPushRef.current = true;
-      if (cleanData.companies) setCompanies(cleanData.companies);
-      if (cleanData.contacts) setContacts(cleanData.contacts);
-      if (cleanData.projects) setProjects(cleanData.projects);
-      if (cleanData.contracts) setContracts(cleanData.contracts);
-      if (cleanData.templates) setTemplates(cleanData.templates);
-      if (cleanData.deals) setDeals(cleanData.deals);
-      if (cleanData.meetings) setMeetings(cleanData.meetings);
+      // Update local states directly (raw setters — must NOT go through write-through wrappers)
+      if (cleanData.companies) setCompaniesState(cleanData.companies);
+      if (cleanData.contacts) setContactsState(cleanData.contacts);
+      if (cleanData.projects) setProjectsState(cleanData.projects);
+      if (cleanData.contracts) setContractsState(cleanData.contracts);
+      if (cleanData.templates) setTemplatesState(cleanData.templates);
+      if (cleanData.deals) setDealsState(cleanData.deals);
+      if (cleanData.meetings) setMeetingsState(cleanData.meetings);
       
       localStorage.setItem('vanguard_has_pulled', 'true');
       setIsSyncing(false);
-      setTimeout(() => {
-        skipAutoPushRef.current = false;
-      }, 2000);
 
       updateTimestamp();
       return { success: true, message: 'Successfully pulled database state from Google Sheets!' };
@@ -1249,22 +1232,17 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       });
 
-      // Update Local State (safeguarded by skipAutoPushRef)
-      skipAutoPushRef.current = true;
-      setCompanies(parsedCompanies);
-      setContacts(parsedContacts);
-      setProjects(parsedProjects);
-      setContracts(parsedContracts);
-      setTemplates(parsedTemplates);
-      setDeals(parsedDeals);
-      setMeetings(parsedMeetings);
+      // Update local states directly (raw setters — must NOT go through write-through wrappers)
+      setCompaniesState(parsedCompanies);
+      setContactsState(parsedContacts);
+      setProjectsState(parsedProjects);
+      setContractsState(parsedContracts);
+      setTemplatesState(parsedTemplates);
+      setDealsState(parsedDeals);
+      setMeetingsState(parsedMeetings);
 
       localStorage.setItem('vanguard_has_pulled', 'true');
       setIsSyncing(false);
-      
-      setTimeout(() => {
-        skipAutoPushRef.current = false;
-      }, 2000);
 
       updateTimestamp();
       return { success: true, message: 'Successfully pulled database state from Turso SQLite!' };
