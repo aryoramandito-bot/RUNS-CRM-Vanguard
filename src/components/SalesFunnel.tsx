@@ -733,7 +733,7 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
                               <Clock size={10} /> {meet.meetingDate}
                             </span>
                           </div>
-                          <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
                             {meet.notes}
                           </p>
                           <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.2rem' }}>
