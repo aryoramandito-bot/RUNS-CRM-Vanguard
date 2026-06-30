@@ -377,15 +377,11 @@ CREATE TABLE IF NOT EXISTS deals (
 
 CREATE TABLE IF NOT EXISTS meetings (
   id TEXT PRIMARY KEY,
-  companyId TEXT,
+  dealId TEXT,
+  meetingDate TEXT,
   title TEXT NOT NULL,
-  date TEXT,
-  time TEXT,
-  type TEXT,
-  status TEXT,
-  summary TEXT,
-  actionItems TEXT,
   attendees TEXT,
+  notes TEXT,
   documents TEXT
 );`;
 
