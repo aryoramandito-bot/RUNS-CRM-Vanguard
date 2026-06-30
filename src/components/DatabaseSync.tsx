@@ -26,6 +26,10 @@ export const DatabaseSync: React.FC = () => {
     return sessionStorage.getItem('vanguard_sync_authed') === 'true';
   });
 
+  const [hasPulled, setHasPulled] = useState(() => {
+    return localStorage.getItem('vanguard_has_pulled') === 'true';
+  });
+
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordInput === '12345') {
@@ -51,6 +55,7 @@ export const DatabaseSync: React.FC = () => {
     if (window.confirm('Pulling from Google Sheets will overwrite your current local database data. Do you wish to proceed?')) {
       const res = await syncFromSheets();
       if (res.success) {
+        setHasPulled(true);
         setSyncResult({ type: 'success', message: res.message });
       } else {
         setSyncResult({ type: 'error', message: res.message });
@@ -325,8 +330,9 @@ function doPost(e) {
                   type="button" 
                   className="btn btn-primary" 
                   onClick={handlePush}
-                  disabled={!urlInput || isSyncing}
-                  style={{ gap: '0.35rem', padding: '0.55rem 1rem', fontSize: '0.8rem' }}
+                  disabled={!urlInput || isSyncing || !hasPulled}
+                  style={{ gap: '0.35rem', padding: '0.55rem 1rem', fontSize: '0.8rem', opacity: (!urlInput || isSyncing || !hasPulled) ? 0.5 : 1 }}
+                  title={!hasPulled ? "Please perform a Pull from Sheets first to link database state" : "Push current state to sheet"}
                 >
                   <ArrowUpCircle size={15} /> 
                   {isSyncing ? 'Syncing...' : 'Push to Sheets'}
@@ -343,6 +349,13 @@ function doPost(e) {
                 </button>
               </div>
             </form>
+
+            {!hasPulled && (
+              <div className="glass-panel" style={{ padding: '0.75rem 1rem', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid var(--accent-amber)', borderRadius: '8px', color: 'var(--accent-amber)', fontSize: '0.75rem', marginTop: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+                <span><strong>Security Lock:</strong> You must click <strong>Pull from Sheets</strong> first to link this device's cache to the cloud before you can push updates.</span>
+              </div>
+            )}
 
             <div style={{ 
               marginTop: '1.25rem', 

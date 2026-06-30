@@ -698,6 +698,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [autoSync, setAutoSyncState] = useState<boolean>(() => {
     return localStorage.getItem('vanguard_auto_sync') !== 'false';
   });
+  const [hasInitialized, setHasInitialized] = useState<boolean>(false);
   
   const setAutoSync = (val: boolean) => {
     setAutoSyncState(val);
@@ -750,6 +751,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (sheetUrl) {
         await syncFromSheets();
       }
+      // Wait 3 seconds for all state setters to batch and settle before enabling auto-push
+      setTimeout(() => {
+        setHasInitialized(true);
+      }, 3000);
     };
     initPull();
   }, []);
@@ -782,6 +787,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (cleanData.deals) setDeals(cleanData.deals);
       if (cleanData.meetings) setMeetings(cleanData.meetings);
       
+      localStorage.setItem('vanguard_has_pulled', 'true');
       setIsSyncing(false);
       setTimeout(() => {
         skipAutoPushRef.current = false;
@@ -847,7 +853,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Debounced auto-save effect
   useEffect(() => {
-    if (!autoSync || !sheetUrl || skipAutoPushRef.current) return;
+    if (!hasInitialized || !autoSync || !sheetUrl || skipAutoPushRef.current) return;
 
     const timer = setTimeout(async () => {
       console.log('Debounced auto-saving changes to Google Sheets...');
@@ -859,7 +865,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4000); // 4 seconds delay of inactivity
 
     return () => clearTimeout(timer);
-  }, [companies, contacts, projects, contracts, templates, deals, meetings, autoSync, sheetUrl]);
+  }, [companies, contacts, projects, contracts, templates, deals, meetings, autoSync, hasInitialized]);
 
   // --- Company Operations ---
   const addCompany = (companyData: Omit<ClientCompany, 'id' | 'dateAdded'>) => {
