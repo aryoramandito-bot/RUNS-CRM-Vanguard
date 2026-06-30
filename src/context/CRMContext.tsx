@@ -596,6 +596,9 @@ const cleanDatesInObject = <T,>(obj: T): T => {
 
 export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [companies, setCompanies] = useState<ClientCompany[]>(() => {
+    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
+    if (hasDB) return [];
+
     const saved = localStorage.getItem('vanguard_companies');
     // Migration check: check if old vanguard_customers exists and contains company data
     if (!saved) {
@@ -622,6 +625,9 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [contacts, setContacts] = useState<ClientContact[]>(() => {
+    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
+    if (hasDB) return [];
+
     const saved = localStorage.getItem('vanguard_contacts');
     // Migration check: if old customers exist, we can migrate them as contacts too
     if (!saved) {
@@ -650,6 +656,9 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [projects, setProjects] = useState<Project[]>(() => {
+    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
+    if (hasDB) return [];
+
     const saved = localStorage.getItem('vanguard_projects');
     if (saved) {
       try {
@@ -667,21 +676,33 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [contracts, setContracts] = useState<Contract[]>(() => {
+    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
+    if (hasDB) return [];
+
     const saved = localStorage.getItem('vanguard_contracts');
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedContracts);
   });
 
   const [templates, setTemplates] = useState<WorkflowTemplate[]>(() => {
+    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
+    if (hasDB) return [];
+
     const saved = localStorage.getItem('vanguard_templates');
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(defaultTemplates);
   });
 
   const [deals, setDeals] = useState<SalesDeal[]>(() => {
+    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
+    if (hasDB) return [];
+
     const saved = localStorage.getItem('vanguard_deals');
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedDeals);
   });
 
   const [meetings, setMeetings] = useState<MeetingLog[]>(() => {
+    const hasDB = localStorage.getItem('vanguard_turso_url') || localStorage.getItem('vanguard_sheets_url');
+    if (hasDB) return [];
+
     const saved = localStorage.getItem('vanguard_meetings');
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedMeetings);
   });
@@ -1103,13 +1124,13 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Update Local State (safeguarded by skipAutoPushRef)
       skipAutoPushRef.current = true;
-      if (parsedCompanies.length > 0) setCompanies(parsedCompanies);
-      if (parsedContacts.length > 0) setContacts(parsedContacts);
-      if (parsedProjects.length > 0) setProjects(parsedProjects);
-      if (parsedContracts.length > 0) setContracts(parsedContracts);
-      if (parsedTemplates.length > 0) setTemplates(parsedTemplates);
-      if (parsedDeals.length > 0) setDeals(parsedDeals);
-      if (parsedMeetings.length > 0) setMeetings(parsedMeetings);
+      setCompanies(parsedCompanies);
+      setContacts(parsedContacts);
+      setProjects(parsedProjects);
+      setContracts(parsedContracts);
+      setTemplates(parsedTemplates);
+      setDeals(parsedDeals);
+      setMeetings(parsedMeetings);
 
       localStorage.setItem('vanguard_has_pulled', 'true');
       setIsSyncing(false);
@@ -1224,10 +1245,47 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (e) {
         console.error('Auto-sync push failed:', e);
       }
-    }, 4000); // 4 seconds delay of inactivity
+    }, 1000); // 1 second delay of inactivity
 
     return () => clearTimeout(timer);
   }, [companies, contacts, projects, contracts, templates, deals, meetings, autoSync, hasInitialized]);
+
+  // Periodic background sync & Window focus sync
+  useEffect(() => {
+    if (!hasInitialized || !autoSync) return;
+    if (!tursoUrl && !sheetUrl) return;
+
+    const handleFocus = () => {
+      if (!isSyncing && document.visibilityState === 'visible') {
+        console.log("Window focused: running background database sync pull...");
+        if (tursoUrl && tursoToken) {
+          syncFromTurso();
+        } else if (sheetUrl) {
+          syncFromSheets();
+        }
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('visibilitychange', handleFocus);
+
+    const interval = setInterval(() => {
+      if (!isSyncing && document.visibilityState === 'visible') {
+        console.log("Interval triggered: running background database sync pull...");
+        if (tursoUrl && tursoToken) {
+          syncFromTurso();
+        } else if (sheetUrl) {
+          syncFromSheets();
+        }
+      }
+    }, 15000); // 15 seconds polling interval
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('visibilitychange', handleFocus);
+      clearInterval(interval);
+    };
+  }, [hasInitialized, autoSync, tursoUrl, tursoToken, sheetUrl, isSyncing]);
 
   // --- Company Operations ---
   const addCompany = (companyData: Omit<ClientCompany, 'id' | 'dateAdded'>) => {
