@@ -10,7 +10,6 @@ import type {
   SalesDealStage,
   MeetingLog,
 } from '../types/crm';
-import { createClient } from '@libsql/client/web';
 
 interface CRMContextType {
   companies: ClientCompany[];
@@ -860,16 +859,9 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Turso Integration State
-  const [tursoUrl, setTursoUrlState] = useState<string>(() => {
-    const val = localStorage.getItem('vanguard_turso_url');
-    // Fall back to hardcoded default if missing OR empty string
-    return (val !== null && val.trim() !== '') ? val.trim() : 'libsql://runs-vanguard-crm-aryoramandito.aws-ap-northeast-1.turso.io';
-  });
-  const [tursoToken, setTursoTokenState] = useState<string>(() => {
-    const val = localStorage.getItem('vanguard_turso_token');
-    // Fall back to hardcoded default if missing OR empty string
-    return (val !== null && val.trim() !== '') ? val.trim() : 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODI3OTg0MzAsImlkIjoiMDE5ZjE2MjUtYTQwMS03MzY4LWIwNTEtNGNkNGZiZDA4ZjU2Iiwia2lkIjoiN1ROMUFUclFnTGtiRDAxUzVRQUsyS1QxZXQ4cHZjLVd4bkJhUEN3UTdlbyIsInJpZCI6IjUxN2I0Yzg5LWNkMjEtNDZiNi05ODY1LWE3NTI0YzU0NmEwYiJ9.XVYu41CGLIYW5LvdMohufmfKmzRC798WyGmJYi8S7oRXzqC7J16zHR7chFNSkKeHR_uX4cTI8ASLVVl6ZO10Bg';
-  });
+  // Credentials are NEVER stored client-side. All DB access goes through /api/turso.
+  const [tursoUrl, setTursoUrlState] = useState<string>('');
+  const [tursoToken, setTursoTokenState] = useState<string>('');
 
   const setTursoUrl = (url: string) => {
     setTursoUrlState(url);
@@ -899,17 +891,21 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('vanguard_last_sync_time', timestamp);
   };
 
-  const getTursoClient = (url = tursoUrl, token = tursoToken) => {
-    if (!url || !token) return null;
-    try {
-      return createClient({
-        url: url.trim(),
-        authToken: token.trim()
-      });
-    } catch (e) {
-      console.error("Failed to initialize Turso client:", e);
-      return null;
+  // ── Turso Proxy Helper ────────────────────────────────────────────────────────
+  // All database access goes through /api/turso (server-side, JWT-protected)
+  // Turso credentials are NEVER present in this client bundle.
+  const callTursoProxy = async (requests: object[]) => {
+    const res = await fetch('/api/turso', {
+      method: 'POST',
+      credentials: 'include', // sends HttpOnly JWT cookie
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requests }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      throw new Error(err.error ?? `Turso proxy error: ${res.status}`);
     }
+    return res.json();
   };
 
   // Sync to localStorage
@@ -948,20 +944,19 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Initial auto-pull from Turso / Sheets on mount if credentials exist
   useEffect(() => {
     const initPull = async () => {
-      if ((tursoUrl && tursoToken) || sheetUrl) {
-        setSyncError(null);
-        try {
-          const res = (tursoUrl && tursoToken) ? await syncFromTurso() : await syncFromSheets();
-          if (res.success) {
-            setHasInitialized(true);
-          } else {
-            setSyncError(res.message);
-          }
-        } catch (err: any) {
-          setSyncError(err.message || 'Unknown database connection error');
+      // Always use the server-side proxy — tursoUrl/tursoToken are no longer client-side
+      setSyncError(null);
+      try {
+        const res = await syncFromTurso();
+        if (res.success) {
+          setHasInitialized(true);
+        } else {
+          // Fallback: if proxy fails (e.g. not logged in yet), still initialize
+          console.warn('DB pull failed, initializing in local mode:', res.message);
+          setHasInitialized(true);
         }
-      } else {
-        // No database configured, run in local sandbox immediately
+      } catch (err: any) {
+        setSyncError(err.message || 'Unknown database connection error');
         setHasInitialized(true);
       }
     };
@@ -1077,162 +1072,97 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Sync pull from Turso SQLite
+  // Sync pull from Turso SQLite (via secure server proxy)
   const syncFromTurso = async (): Promise<{ success: boolean; message: string }> => {
-    const client = getTursoClient();
-    if (!client) return { success: false, message: 'Turso URL or Auth Token is not configured.' };
-
     setIsSyncing(true);
     try {
-      const results = await client.batch([
-        "SELECT * FROM companies;",
-        "SELECT * FROM contacts;",
-        "SELECT * FROM projects;",
-        "SELECT * FROM contracts;",
-        "SELECT * FROM templates;",
-        "SELECT * FROM deals;",
-        "SELECT * FROM meetings;"
-      ], "read");
+      const data = await callTursoProxy([
+        { type: 'execute', stmt: { sql: 'SELECT * FROM companies;', args: [] } },
+        { type: 'execute', stmt: { sql: 'SELECT * FROM contacts;', args: [] } },
+        { type: 'execute', stmt: { sql: 'SELECT * FROM projects;', args: [] } },
+        { type: 'execute', stmt: { sql: 'SELECT * FROM contracts;', args: [] } },
+        { type: 'execute', stmt: { sql: 'SELECT * FROM templates;', args: [] } },
+        { type: 'execute', stmt: { sql: 'SELECT * FROM deals;', args: [] } },
+        { type: 'execute', stmt: { sql: 'SELECT * FROM meetings;', args: [] } },
+        { type: 'close' },
+      ]);
 
-      // Parse results
-      const dbCompanies = results[0].rows as unknown as any[];
-      const dbContacts = results[1].rows as unknown as any[];
-      const dbProjects = results[2].rows as unknown as any[];
-      const dbContracts = results[3].rows as unknown as any[];
-      const dbTemplates = results[4].rows as unknown as any[];
-      const dbDeals = results[5].rows as unknown as any[];
-      const dbMeetings = results[6].rows as unknown as any[];
+      const getRows = (idx: number) => data?.results?.[idx]?.response?.result?.rows ?? [];
 
-      // Map values and handle JSON strings
-      const parsedCompanies = dbCompanies.map(c => ({
-        id: String(c.id),
-        name: String(c.name),
-        industry: c.industry ? String(c.industry) : '',
-        email: c.email ? String(c.email) : '',
-        phone: c.phone ? String(c.phone) : '',
-        address: c.address ? String(c.address) : '',
-        status: c.status ? String(c.status) as any : 'Active',
-        dateAdded: c.dateAdded ? String(c.dateAdded) : new Date().toISOString()
+      const dbCompanies = getRows(0);
+      const dbContacts = getRows(1);
+      const dbProjects = getRows(2);
+      const dbContracts = getRows(3);
+      const dbTemplates = getRows(4);
+      const dbDeals = getRows(5);
+      const dbMeetings = getRows(6);
+
+      // Turso HTTP API: rows are arrays of {value, type} cells
+      // Column order matches the SELECT * FROM table schema order
+
+      const v = (cell: any) => (cell?.value !== undefined && cell?.value !== null) ? cell.value : null;
+      const str = (cell: any, fallback = '') => { const x = v(cell); return x !== null ? String(x) : fallback; };
+      const num = (cell: any) => { const x = v(cell); return x !== null ? Number(x) : 0; };
+      const json = (cell: any) => {
+        const x = v(cell);
+        if (!x) return [];
+        try { return typeof x === 'string' ? JSON.parse(x) : x; } catch { return []; }
+      };
+
+      // companies: id, name, industry, email, phone, address, status, dateAdded
+      const parsedCompanies = dbCompanies.map((r: any[]) => ({
+        id: str(r[0]), name: str(r[1]), industry: str(r[2]), email: str(r[3]),
+        phone: str(r[4]), address: str(r[5]), status: (str(r[6]) || 'Active') as any,
+        dateAdded: str(r[7]) || new Date().toISOString()
       }));
 
-      const parsedContacts = dbContacts.map(c => ({
-        id: String(c.id),
-        companyId: String(c.companyId),
-        name: String(c.name),
-        email: c.email ? String(c.email) : '',
-        phone: c.phone ? String(c.phone) : '',
-        status: c.status ? String(c.status) as any : 'Active',
-        role: c.role ? String(c.role) : '',
-        dateAdded: c.dateAdded ? String(c.dateAdded) : new Date().toISOString()
+      // contacts: id, companyId, name, email, phone, status, role, dateAdded
+      const parsedContacts = dbContacts.map((r: any[]) => ({
+        id: str(r[0]), companyId: str(r[1]), name: str(r[2]), email: str(r[3]),
+        phone: str(r[4]), status: (str(r[5]) || 'Active') as any, role: str(r[6]),
+        dateAdded: str(r[7]) || new Date().toISOString()
       }));
 
-      const parsedProjects = dbProjects.map(p => ({
-        id: String(p.id),
-        companyId: String(p.companyId),
-        name: String(p.name),
-        code: p.code ? String(p.code) : '',
-        budget: Number(p.budget) || 0,
-        currency: p.currency ? String(p.currency) as any : 'IDR',
-        status: p.status ? String(p.status) as any : 'Planning',
-        startDate: p.startDate ? String(p.startDate) : '',
-        endDate: p.endDate ? String(p.endDate) : '',
-        description: p.description ? String(p.description) : ''
+      // projects: id, companyId, name, code, budget, currency, status, startDate, endDate, description
+      const parsedProjects = dbProjects.map((r: any[]) => ({
+        id: str(r[0]), companyId: str(r[1]), name: str(r[2]), code: str(r[3]),
+        budget: num(r[4]), currency: (str(r[5]) || 'IDR') as any,
+        status: (str(r[6]) || 'Planning') as any, startDate: str(r[7]),
+        endDate: str(r[8]), description: str(r[9])
       }));
 
-      const parsedContracts = dbContracts.map(c => {
-        let parsedStages = [];
-        if (c.stages) {
-          try {
-            parsedStages = typeof c.stages === 'string' ? JSON.parse(c.stages) : c.stages;
-          } catch (e) {
-            console.error("Failed to parse stages JSON:", e);
-          }
-        }
-        return {
-          id: String(c.id),
-          projectId: String(c.projectId),
-          title: String(c.title),
-          contractNumber: c.contractNumber ? String(c.contractNumber) : '',
-          type: c.type ? String(c.type) : 'Fixed Price',
-          value: Number(c.value) || 0,
-          currency: c.currency ? String(c.currency) as any : 'IDR',
-          status: c.status ? String(c.status) as any : 'Active',
-          signDate: c.signDate ? String(c.signDate) : '',
-          startDate: c.startDate ? String(c.startDate) : '',
-          endDate: c.endDate ? String(c.endDate) : '',
-          stages: parsedStages
-        };
-      });
+      // contracts: id, projectId, title, contractNumber, type, value, currency, status, signDate, startDate, endDate, stages
+      const parsedContracts = dbContracts.map((r: any[]) => ({
+        id: str(r[0]), projectId: str(r[1]), title: str(r[2]), contractNumber: str(r[3]),
+        type: str(r[4]) || 'Fixed Price', value: num(r[5]),
+        currency: (str(r[6]) || 'IDR') as any, status: (str(r[7]) || 'Active') as any,
+        signDate: str(r[8]), startDate: str(r[9]), endDate: str(r[10]),
+        stages: json(r[11])
+      }));
 
-      const parsedTemplates = dbTemplates.map(t => {
-        let parsedStages = [];
-        if (t.stages) {
-          try {
-            parsedStages = typeof t.stages === 'string' ? JSON.parse(t.stages) : t.stages;
-          } catch (e) {
-            console.error("Failed to parse template stages JSON:", e);
-          }
-        }
-        return {
-          contractType: String(t.contractType),
-          stages: parsedStages
-        };
-      });
+      // templates: contractType, stages
+      const parsedTemplates = dbTemplates.map((r: any[]) => ({
+        contractType: str(r[0]), stages: json(r[1])
+      }));
 
-      const parsedDeals = dbDeals.map(d => {
-        let parsedQuotationItems = [];
-        if (d.quotationItems) {
-          try {
-            parsedQuotationItems = typeof d.quotationItems === 'string' ? JSON.parse(d.quotationItems) : d.quotationItems;
-          } catch (e) {
-            console.error("Failed to parse quotation items JSON:", e);
-          }
-        }
-        return {
-          id: String(d.id),
-          companyId: String(d.companyId),
-          contactId: String(d.contactId),
-          title: String(d.title),
-          stage: String(d.stage) as any,
-          value: Number(d.value) || 0,
-          currency: d.currency ? String(d.currency) as any : 'IDR',
-          estimatedCloseDate: d.estimatedCloseDate ? String(d.estimatedCloseDate) : '',
-          description: d.description ? String(d.description) : '',
-          createdAt: d.createdAt ? String(d.createdAt) : new Date().toISOString(),
-          quotationItems: parsedQuotationItems,
-          quotationDate: d.quotationDate ? String(d.quotationDate) : undefined,
-          quotationExpiry: d.quotationExpiry ? String(d.quotationExpiry) : undefined,
-          quotationTerms: d.quotationTerms ? String(d.quotationTerms) : undefined
-        };
-      });
+      // deals: id, companyId, contactId, title, stage, value, currency, estimatedCloseDate, description, createdAt, quotationItems, quotationDate, quotationExpiry, quotationTerms
+      const parsedDeals = dbDeals.map((r: any[]) => ({
+        id: str(r[0]), companyId: str(r[1]), contactId: str(r[2]), title: str(r[3]),
+        stage: str(r[4]) as any, value: num(r[5]), currency: (str(r[6]) || 'IDR') as any,
+        estimatedCloseDate: str(r[7]), description: str(r[8]),
+        createdAt: str(r[9]) || new Date().toISOString(),
+        quotationItems: json(r[10]),
+        quotationDate: v(r[11]) ? str(r[11]) : undefined,
+        quotationExpiry: v(r[12]) ? str(r[12]) : undefined,
+        quotationTerms: v(r[13]) ? str(r[13]) : undefined
+      }));
 
-      const parsedMeetings = dbMeetings.map(m => {
-        let parsedAttendees = [];
-        if (m.attendees) {
-          try {
-            parsedAttendees = typeof m.attendees === 'string' ? JSON.parse(m.attendees) : m.attendees;
-          } catch (e) {
-            console.error("Failed to parse attendees JSON:", e);
-          }
-        }
-        let parsedDocuments = [];
-        if (m.documents) {
-          try {
-            parsedDocuments = typeof m.documents === 'string' ? JSON.parse(m.documents) : m.documents;
-          } catch (e) {
-            console.error("Failed to parse documents JSON:", e);
-          }
-        }
-        return {
-          id: String(m.id),
-          dealId: String(m.dealId),
-          meetingDate: String(m.meetingDate),
-          title: String(m.title),
-          notes: m.notes ? String(m.notes) : '',
-          attendees: parsedAttendees,
-          documents: parsedDocuments
-        };
-      });
+      // meetings: id, dealId, meetingDate, title, attendees, notes, documents
+      const parsedMeetings = dbMeetings.map((r: any[]) => ({
+        id: str(r[0]), dealId: str(r[1]), meetingDate: str(r[2]), title: str(r[3]),
+        attendees: json(r[4]), notes: str(r[5]), documents: json(r[6])
+      }));
+
 
       // Update local states directly (raw setters — must NOT go through write-through wrappers)
       setCompaniesState(parsedCompanies);
@@ -1254,10 +1184,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Sync push to Turso SQLite
+  // Sync push to Turso SQLite (via secure server proxy)
   const syncToTurso = async (
-    targetUrl = tursoUrl, 
-    targetToken = tursoToken,
+    _targetUrl?: string,
+    _targetToken?: string,
     overrides?: {
       companies?: ClientCompany[];
       contacts?: ClientContact[];
@@ -1268,100 +1198,81 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       meetings?: MeetingLog[];
     }
   ): Promise<{ success: boolean; message: string }> => {
-    const client = getTursoClient(targetUrl, targetToken);
-    if (!client) return { success: false, message: 'Turso URL or Auth Token is not configured.' };
-
     setIsSyncing(true);
     try {
-      const statements: any[] = [];
+      // Convert value to Turso HTTP API arg format
+      const arg = (val: any) => ({ type: 'text', value: String(val ?? '') });
+
+      const requests: object[] = [];
       const shouldWriteAll = !overrides;
 
-      // Companies
       if (shouldWriteAll || overrides?.companies) {
         const list = overrides?.companies || companies;
-        statements.push("DELETE FROM companies;");
-        list.forEach(c => {
-          statements.push({
-            sql: "INSERT INTO companies (id, name, industry, email, phone, address, status, dateAdded) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
-            args: [c.id, c.name, c.industry, c.email, c.phone, c.address, c.status, c.dateAdded]
-          });
-        });
+        requests.push({ type: 'execute', stmt: { sql: 'DELETE FROM companies;', args: [] } });
+        list.forEach(c => requests.push({ type: 'execute', stmt: {
+          sql: 'INSERT INTO companies (id, name, industry, email, phone, address, status, dateAdded) VALUES (?, ?, ?, ?, ?, ?, ?, ?);',
+          args: [arg(c.id), arg(c.name), arg(c.industry), arg(c.email), arg(c.phone), arg(c.address), arg(c.status), arg(c.dateAdded)]
+        }}));
       }
 
-      // Contacts
       if (shouldWriteAll || overrides?.contacts) {
         const list = overrides?.contacts || contacts;
-        statements.push("DELETE FROM contacts;");
-        list.forEach(c => {
-          statements.push({
-            sql: "INSERT INTO contacts (id, companyId, name, email, phone, status, role, dateAdded) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
-            args: [c.id, c.companyId, c.name, c.email, c.phone, c.status, c.role, c.dateAdded]
-          });
-        });
+        requests.push({ type: 'execute', stmt: { sql: 'DELETE FROM contacts;', args: [] } });
+        list.forEach(c => requests.push({ type: 'execute', stmt: {
+          sql: 'INSERT INTO contacts (id, companyId, name, email, phone, status, role, dateAdded) VALUES (?, ?, ?, ?, ?, ?, ?, ?);',
+          args: [arg(c.id), arg(c.companyId), arg(c.name), arg(c.email), arg(c.phone), arg(c.status), arg(c.role), arg(c.dateAdded)]
+        }}));
       }
 
-      // Projects
       if (shouldWriteAll || overrides?.projects) {
         const list = overrides?.projects || projects;
-        statements.push("DELETE FROM projects;");
-        list.forEach(p => {
-          statements.push({
-            sql: "INSERT INTO projects (id, companyId, name, code, budget, currency, status, startDate, endDate, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
-            args: [p.id, p.companyId, p.name, p.code, p.budget, p.currency, p.status, p.startDate, p.endDate, p.description]
-          });
-        });
+        requests.push({ type: 'execute', stmt: { sql: 'DELETE FROM projects;', args: [] } });
+        list.forEach(p => requests.push({ type: 'execute', stmt: {
+          sql: 'INSERT INTO projects (id, companyId, name, code, budget, currency, status, startDate, endDate, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+          args: [arg(p.id), arg(p.companyId), arg(p.name), arg(p.code), arg(p.budget), arg(p.currency), arg(p.status), arg(p.startDate), arg(p.endDate), arg(p.description)]
+        }}));
       }
 
-      // Contracts
       if (shouldWriteAll || overrides?.contracts) {
         const list = overrides?.contracts || contracts;
-        statements.push("DELETE FROM contracts;");
-        list.forEach(c => {
-          statements.push({
-            sql: "INSERT INTO contracts (id, projectId, title, contractNumber, type, value, currency, status, signDate, startDate, endDate, stages) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
-            args: [c.id, c.projectId, c.title, c.contractNumber, c.type, c.value, c.currency, c.status, c.signDate, c.startDate, c.endDate, JSON.stringify(c.stages)]
-          });
-        });
+        requests.push({ type: 'execute', stmt: { sql: 'DELETE FROM contracts;', args: [] } });
+        list.forEach(c => requests.push({ type: 'execute', stmt: {
+          sql: 'INSERT INTO contracts (id, projectId, title, contractNumber, type, value, currency, status, signDate, startDate, endDate, stages) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+          args: [arg(c.id), arg(c.projectId), arg(c.title), arg(c.contractNumber), arg(c.type), arg(c.value), arg(c.currency), arg(c.status), arg(c.signDate), arg(c.startDate), arg(c.endDate), arg(JSON.stringify(c.stages))]
+        }}));
       }
 
-      // Templates
       if (shouldWriteAll || overrides?.templates) {
         const list = overrides?.templates || templates;
-        statements.push("DELETE FROM templates;");
-        list.forEach(t => {
-          statements.push({
-            sql: "INSERT INTO templates (contractType, stages) VALUES (?, ?);",
-            args: [t.contractType, JSON.stringify(t.stages)]
-          });
-        });
+        requests.push({ type: 'execute', stmt: { sql: 'DELETE FROM templates;', args: [] } });
+        list.forEach(t => requests.push({ type: 'execute', stmt: {
+          sql: 'INSERT INTO templates (contractType, stages) VALUES (?, ?);',
+          args: [arg(t.contractType), arg(JSON.stringify(t.stages))]
+        }}));
       }
 
-      // Deals
       if (shouldWriteAll || overrides?.deals) {
         const list = overrides?.deals || deals;
-        statements.push("DELETE FROM deals;");
-        list.forEach(d => {
-          statements.push({
-            sql: "INSERT INTO deals (id, companyId, contactId, title, stage, value, currency, estimatedCloseDate, description, createdAt, quotationItems, quotationDate, quotationExpiry, quotationTerms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
-            args: [d.id, d.companyId, d.contactId, d.title, d.stage, d.value, d.currency, d.estimatedCloseDate, d.description, d.createdAt, JSON.stringify(d.quotationItems || []), d.quotationDate || "", d.quotationExpiry || "", d.quotationTerms || ""]
-          });
-        });
+        requests.push({ type: 'execute', stmt: { sql: 'DELETE FROM deals;', args: [] } });
+        list.forEach(d => requests.push({ type: 'execute', stmt: {
+          sql: 'INSERT INTO deals (id, companyId, contactId, title, stage, value, currency, estimatedCloseDate, description, createdAt, quotationItems, quotationDate, quotationExpiry, quotationTerms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+          args: [arg(d.id), arg(d.companyId), arg(d.contactId), arg(d.title), arg(d.stage), arg(d.value), arg(d.currency), arg(d.estimatedCloseDate), arg(d.description), arg(d.createdAt), arg(JSON.stringify(d.quotationItems || [])), arg(d.quotationDate || ''), arg(d.quotationExpiry || ''), arg(d.quotationTerms || '')]
+        }}));
       }
 
-      // Meetings
       if (shouldWriteAll || overrides?.meetings) {
         const list = overrides?.meetings || meetings;
-        statements.push("DELETE FROM meetings;");
-        list.forEach(m => {
-          statements.push({
-            sql: "INSERT INTO meetings (id, dealId, meetingDate, title, attendees, notes, documents) VALUES (?, ?, ?, ?, ?, ?, ?);",
-            args: [m.id, m.dealId, m.meetingDate, m.title, JSON.stringify(m.attendees || []), m.notes || "", JSON.stringify(m.documents || [])]
-          });
-        });
+        requests.push({ type: 'execute', stmt: { sql: 'DELETE FROM meetings;', args: [] } });
+        list.forEach(m => requests.push({ type: 'execute', stmt: {
+          sql: 'INSERT INTO meetings (id, dealId, meetingDate, title, attendees, notes, documents) VALUES (?, ?, ?, ?, ?, ?, ?);',
+          args: [arg(m.id), arg(m.dealId), arg(m.meetingDate), arg(m.title), arg(JSON.stringify(m.attendees || [])), arg(m.notes || ''), arg(JSON.stringify(m.documents || []))]
+        }}));
       }
 
-      if (statements.length > 0) {
-        await client.batch(statements, "write");
+      requests.push({ type: 'close' });
+
+      if (requests.length > 1) {
+        await callTursoProxy(requests);
       }
       setIsSyncing(false);
       updateTimestamp();
