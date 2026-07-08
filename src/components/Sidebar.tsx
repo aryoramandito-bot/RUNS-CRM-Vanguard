@@ -9,9 +9,11 @@ import {
   Database,
   Sun,
   Moon,
-  ClipboardList
+  ClipboardList,
+  LogOut
 } from 'lucide-react';
 import { useCRM } from '../context/CRMContext';
+import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
   activeTab: string;
@@ -22,6 +24,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, theme, toggleTheme }) => {
   const { sheetUrl, tursoUrl, lastSyncTime } = useCRM();
+  const { user, logout } = useAuth();
   
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -170,6 +173,61 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, theme
             </span>
           )}
         </div>
+
+        {/* Logged-in user panel */}
+        {user && (
+          <div style={{
+            marginTop: '0.5rem',
+            paddingTop: '0.75rem',
+            borderTop: '1px solid var(--border-glass)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+              <div style={{
+                width: '32px', height: '32px', borderRadius: '50%',
+                background: 'linear-gradient(135deg, rgba(99,102,241,0.4), rgba(34,211,238,0.3))',
+                border: '1px solid rgba(99,102,241,0.4)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent-indigo)',
+                flexShrink: 0,
+              }}>
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {user.name}
+                </div>
+                <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {user.email}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{
+                fontSize: '0.6rem', fontWeight: 700, padding: '0.15rem 0.5rem',
+                borderRadius: '8px', textTransform: 'uppercase', letterSpacing: '0.05em',
+                background: user.role === 'admin' ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.06)',
+                color: user.role === 'admin' ? 'var(--accent-indigo)' : 'var(--text-muted)',
+                border: `1px solid ${user.role === 'admin' ? 'rgba(99,102,241,0.3)' : 'var(--border-glass)'}`,
+              }}>
+                {user.role}
+              </span>
+              <button
+                onClick={logout}
+                title="Sign out"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
+                  gap: '0.3rem', fontSize: '0.7rem', padding: '0.2rem 0.4rem',
+                  borderRadius: 'var(--radius-sm)', transition: 'all 0.15s',
+                }}
+                onMouseOver={e => (e.currentTarget.style.color = 'var(--error)')}
+                onMouseOut={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+              >
+                <LogOut size={13} /> Sign out
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   );
