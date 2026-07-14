@@ -623,13 +623,10 @@ const cleanDatesInObject = <T,>(obj: T): T => {
 };
 
 export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const shouldBypassCache = (): boolean => {
-    const tursoSaved = localStorage.getItem('vanguard_turso_url');
-    const sheetsSaved = localStorage.getItem('vanguard_sheets_url');
-    const activeTursoUrl = tursoSaved !== null ? tursoSaved : 'libsql://runs-vanguard-crm-aryoramandito.aws-ap-northeast-1.turso.io';
-    const activeSheetsUrl = sheetsSaved !== null ? sheetsSaved : 'https://script.google.com/macros/s/AKfycby0n9ubHy9zkLk47U4dzyzGrCE9hueKKWfgWGU04CWWuN-pPD7dwaHEJoISBgwzPdu38Q/exec';
-    return !!(activeTursoUrl || activeSheetsUrl);
-  };
+  // With server-side proxy auth, localStorage IS the initial state.
+  // We never bypass localStorage — the proxy pull after mount will update it.
+  const shouldBypassCache = (): boolean => false;
+
 
   const [companies, setCompaniesState] = useState<ClientCompany[]>(() => {
     if (shouldBypassCache()) return [];
@@ -745,33 +742,13 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deals?: SalesDeal[];
     meetings?: MeetingLog[];
   }) => {
-    if (tursoUrl && tursoToken) {
-      await syncToTurso(tursoUrl, tursoToken, updates);
-    } else if (sheetUrl) {
-      const payload = {
-        companies: updates.companies || companies,
-        contacts: updates.contacts || contacts,
-        projects: updates.projects || projects,
-        contracts: updates.contracts || contracts,
-        templates: updates.templates || templates,
-        deals: updates.deals || deals,
-        meetings: updates.meetings || meetings,
-      };
-      setIsSyncing(true);
-      try {
-        await fetch(sheetUrl, {
-          method: 'POST',
-          mode: 'cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(payload),
-          redirect: 'follow',
-        });
-        setIsSyncing(false);
-        updateTimestamp();
-      } catch (e) {
-        setIsSyncing(false);
-        console.error("Failed to push to Sheets:", e);
-      }
+    // Always push through server-side proxy (JWT cookie handles auth).
+    // If user is not logged in the proxy returns 401 and we silently ignore.
+    try {
+      await syncToTurso(undefined, undefined, updates);
+    } catch (e) {
+      // Proxy failed (e.g. not yet logged in) — data is safely in localStorage
+      console.warn('[saveAndPushState] Proxy push skipped:', (e as Error).message);
     }
   };
 
@@ -941,27 +918,25 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('vanguard_stage_probs', JSON.stringify(stageProbabilities));
   }, [stageProbabilities]);
 
-  // Initial auto-pull from Turso / Sheets on mount if credentials exist
+  // Initial pull: start with localStorage (already loaded in useState), then
+  // attempt a Turso pull to refresh. If the proxy returns 401 (not logged in yet),
+  // the app still shows localStorage data — nothing is lost.
   useEffect(() => {
     const initPull = async () => {
-      // Always use the server-side proxy — tursoUrl/tursoToken are no longer client-side
+      setHasInitialized(true); // Show app immediately using localStorage data
       setSyncError(null);
       try {
         const res = await syncFromTurso();
-        if (res.success) {
-          setHasInitialized(true);
-        } else {
-          // Fallback: if proxy fails (e.g. not logged in yet), still initialize
-          console.warn('DB pull failed, initializing in local mode:', res.message);
-          setHasInitialized(true);
+        if (!res.success) {
+          console.warn('[initPull] Turso pull failed (possibly not logged in yet):', res.message);
         }
       } catch (err: any) {
-        setSyncError(err.message || 'Unknown database connection error');
-        setHasInitialized(true);
+        console.warn('[initPull] Proxy error on mount:', err.message);
       }
     };
     initPull();
   }, []);
+
 
   const retryInitialPull = async () => {
     setSyncError(null);
@@ -1288,16 +1263,11 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Periodic background sync & Window focus sync
   useEffect(() => {
     if (!hasInitialized || !autoSync) return;
-    if (!tursoUrl && !sheetUrl) return;
 
     const handleFocus = () => {
       if (!isSyncing && document.visibilityState === 'visible') {
-        console.log("Window focused: running background database sync pull...");
-        if (tursoUrl && tursoToken) {
-          syncFromTurso();
-        } else if (sheetUrl) {
-          syncFromSheets();
-        }
+        console.log('Window focused: running background Turso sync pull...');
+        syncFromTurso();
       }
     };
 
@@ -1306,21 +1276,18 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const interval = setInterval(() => {
       if (!isSyncing && document.visibilityState === 'visible') {
-        console.log("Interval triggered: running background database sync pull...");
-        if (tursoUrl && tursoToken) {
-          syncFromTurso();
-        } else if (sheetUrl) {
-          syncFromSheets();
-        }
+        console.log('Interval triggered: running background Turso sync pull...');
+        syncFromTurso();
       }
-    }, 15000); // 15 seconds polling interval
+    }, 15000);
 
     return () => {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('visibilitychange', handleFocus);
       clearInterval(interval);
     };
-  }, [hasInitialized, autoSync, tursoUrl, tursoToken, sheetUrl, isSyncing]);
+  }, [hasInitialized, autoSync, isSyncing]);
+
 
   // --- Company Operations ---
   const addCompany = (companyData: Omit<ClientCompany, 'id' | 'dateAdded'>) => {
