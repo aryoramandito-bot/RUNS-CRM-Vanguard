@@ -1016,7 +1016,7 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
 
                   {/* Current quote list */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', items: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>Quotation Items</span>
                       {selectedDeal.quotationItems.length > 0 && (
                         <button 
