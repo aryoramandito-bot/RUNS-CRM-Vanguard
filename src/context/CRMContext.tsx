@@ -19,6 +19,7 @@ interface CRMContextType {
   templates: WorkflowTemplate[];
   deals: SalesDeal[];
   meetings: MeetingLog[];
+  runsQuotations: any[];
   
   // Google Sheet Integration
   sheetUrl: string;
@@ -733,6 +734,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? cleanDatesInObject(JSON.parse(saved)) : cleanDatesInObject(seedMeetings);
   });
 
+  const [runsQuotations, setRunsQuotations] = useState<any[]>(() => {
+    if (shouldBypassCache()) return [];
+    const saved = localStorage.getItem('vanguard_runs_quotations');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const saveAndPushState = async (updates: {
     companies?: ClientCompany[];
     contacts?: ClientContact[];
@@ -742,13 +749,37 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deals?: SalesDeal[];
     meetings?: MeetingLog[];
   }) => {
-    // Always push through server-side proxy (JWT cookie handles auth).
-    // If user is not logged in the proxy returns 401 and we silently ignore.
+    // ── Primary: Turso (via server-side proxy) ──────────────────────────────
+    let tursoPushOk = false;
     try {
       await syncToTurso(undefined, undefined, updates);
+      tursoPushOk = true;
     } catch (e) {
-      // Proxy failed (e.g. not yet logged in) — data is safely in localStorage
-      console.warn('[saveAndPushState] Proxy push skipped:', (e as Error).message);
+      console.warn('[saveAndPushState] Turso push failed:', (e as Error).message);
+    }
+
+    // ── Backup: Google Sheets (fire-and-forget, non-blocking) ──────────────
+    if (sheetUrl) {
+      const payload = {
+        companies:  updates.companies  || companies,
+        contacts:   updates.contacts   || contacts,
+        projects:   updates.projects   || projects,
+        contracts:  updates.contracts  || contracts,
+        templates:  updates.templates  || templates,
+        deals:      updates.deals      || deals,
+        meetings:   updates.meetings   || meetings,
+      };
+      fetch(sheetUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload),
+        redirect: 'follow',
+      }).then(() => {
+        if (!tursoPushOk) console.info('[saveAndPushState] Sheets backup succeeded after Turso failure.');
+      }).catch(err => {
+        console.warn('[saveAndPushState] Sheets backup also failed:', err.message);
+      });
     }
   };
 
@@ -915,23 +946,32 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [meetings]);
 
   useEffect(() => {
+    localStorage.setItem('vanguard_runs_quotations', JSON.stringify(runsQuotations));
+  }, [runsQuotations]);
+
+  useEffect(() => {
     localStorage.setItem('vanguard_stage_probs', JSON.stringify(stageProbabilities));
   }, [stageProbabilities]);
 
-  // Initial pull: start with localStorage (already loaded in useState), then
-  // attempt a Turso pull to refresh. If the proxy returns 401 (not logged in yet),
-  // the app still shows localStorage data — nothing is lost.
+  // Initial pull on mount:
+  //   1. Show app immediately with localStorage data (no flicker / blank screen)
+  //   2. Try Turso (primary) — refreshes state with latest server data
+  //   3. If Turso fails, fall back to Google Sheets (backup read)
   useEffect(() => {
     const initPull = async () => {
-      setHasInitialized(true); // Show app immediately using localStorage data
+      setHasInitialized(true); // Show app immediately with localStorage data
       setSyncError(null);
       try {
-        const res = await syncFromTurso();
-        if (!res.success) {
-          console.warn('[initPull] Turso pull failed (possibly not logged in yet):', res.message);
+        const tursoRes = await syncFromTurso();
+        if (!tursoRes.success) {
+          console.warn('[initPull] Turso failed, trying Sheets backup:', tursoRes.message);
+          if (sheetUrl) await syncFromSheets();
         }
       } catch (err: any) {
-        console.warn('[initPull] Proxy error on mount:', err.message);
+        console.warn('[initPull] Turso proxy error, trying Sheets backup:', err.message);
+        try {
+          if (sheetUrl) await syncFromSheets();
+        } catch { /* ignore */ }
       }
     };
     initPull();
@@ -941,18 +981,29 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const retryInitialPull = async () => {
     setSyncError(null);
     setHasInitialized(false);
-    if ((tursoUrl && tursoToken) || sheetUrl) {
-      try {
-        const res = (tursoUrl && tursoToken) ? await syncFromTurso() : await syncFromSheets();
-        if (res.success) {
-          setHasInitialized(true);
-        } else {
-          setSyncError(res.message);
-        }
-      } catch (err: any) {
-        setSyncError(err.message || 'Unknown database connection error');
+    try {
+      // Turso primary
+      const tursoRes = await syncFromTurso();
+      if (tursoRes.success) {
+        setHasInitialized(true);
+        return;
       }
-    } else {
+      console.warn('[retry] Turso failed, trying Sheets backup:', tursoRes.message);
+    } catch (err: any) {
+      console.warn('[retry] Turso proxy error:', err.message);
+    }
+    // Sheets fallback
+    try {
+      if (sheetUrl) {
+        const sheetRes = await syncFromSheets();
+        if (sheetRes.success) { setHasInitialized(true); return; }
+        setSyncError(sheetRes.message);
+      } else {
+        setSyncError('Turso unavailable and no Sheets backup configured.');
+      }
+    } catch (err: any) {
+      setSyncError(err.message || 'All database connections failed.');
+    } finally {
       setHasInitialized(true);
     }
   };
@@ -1147,6 +1198,27 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTemplatesState(parsedTemplates);
       setDealsState(parsedDeals);
       setMeetingsState(parsedMeetings);
+
+      // Separate, resilient fetch for RUNS Quote quotations
+      try {
+        const quoteData = await callTursoProxy([
+          { type: 'execute', stmt: { sql: 'SELECT id, client_name, industry, reference_number, date, pricing, selected_processes FROM quotations;', args: [] } },
+          { type: 'close' }
+        ]);
+        const quoteRows = quoteData?.results?.[0]?.response?.result?.rows ?? [];
+        const parsedQuotes = quoteRows.map((r: any[]) => ({
+          id: str(r[0]),
+          client_name: str(r[1]),
+          industry: str(r[2]),
+          reference_number: str(r[3]),
+          date: str(r[4]),
+          pricing: json(r[5]),
+          selected_processes: json(r[6])
+        }));
+        setRunsQuotations(parsedQuotes);
+      } catch (err) {
+        console.warn('Failed to sync quotations from Turso (ignoring):', err);
+      }
 
       localStorage.setItem('vanguard_has_pulled', 'true');
       setIsSyncing(false);
@@ -1561,6 +1633,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         templates,
         deals,
         meetings,
+        runsQuotations,
         sheetUrl,
         setSheetUrl,
         isSyncing,

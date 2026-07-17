@@ -39,7 +39,8 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
     deleteMeetingLog,
     projects,
     addProject,
-    addContract
+    addContract,
+    runsQuotations
   } = useCRM();
 
   // Search & Filters
@@ -916,9 +917,106 @@ export const SalesFunnel: React.FC<SalesFunnelProps> = ({ onDealWon }) => {
               {subTab === 'quotation' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                   
+                  {/* Link to RUNS Quote Proposal */}
+                  <div className="glass-panel" style={{ padding: '1rem', border: '1px dashed var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(99, 102, 241, 0.02)' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      🔗 Import from RUNS Quote
+                    </span>
+                    <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: 0 }}>
+                      Tautkan penawaran resmi dari portal RUNS Quote untuk mengisi rincian item, tanggal, dan nilai deal secara otomatis.
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                      <select
+                        onChange={(e) => {
+                          const quoteId = e.target.value;
+                          if (!quoteId) return;
+                          
+                          const q = (runsQuotations || []).find(item => item.id === quoteId);
+                          if (!q) return;
+
+                          const pricing = q.pricing || {};
+                          const newItems = [];
+                          
+                          // 1. License fees
+                          const activeProducts = pricing.activeProducts || [];
+                          activeProducts.forEach((prod: string) => {
+                            const count = pricing.productCounts?.[prod] || 0;
+                            const unitPrice = pricing.productPrices?.[prod] || 0;
+                            const total = count * unitPrice * (pricing.periodMonths || 1);
+                            if (total > 0) {
+                              newItems.push({
+                                id: Math.random().toString(36).substring(2, 11),
+                                description: `Lisensi: ${prod} (${count} User x ${pricing.periodMonths} Bulan)`,
+                                quantity: 1,
+                                unitPrice: total
+                              });
+                            }
+                          });
+
+                          // 2. Implementation fees
+                          if (pricing.implementationFee > 0) {
+                            newItems.push({
+                              id: Math.random().toString(36).substring(2, 11),
+                              description: 'Jasa Implementasi & Kustomisasi ERP',
+                              quantity: 1,
+                              unitPrice: pricing.implementationFee
+                            });
+                          }
+
+                          // 3. Migration fees
+                          if (pricing.dataMigrationFee > 0) {
+                            newItems.push({
+                              id: Math.random().toString(36).substring(2, 11),
+                              description: 'Jasa Migrasi Data',
+                              quantity: 1,
+                              unitPrice: pricing.dataMigrationFee
+                            });
+                          }
+
+                          // 4. Training fees
+                          if (pricing.userTrainingFee > 0) {
+                            newItems.push({
+                              id: Math.random().toString(36).substring(2, 11),
+                              description: 'Jasa Pelatihan Pengguna (Training)',
+                              quantity: 1,
+                              unitPrice: pricing.userTrainingFee
+                            });
+                          }
+
+                          // Calculate grand total including PPN if useTax is active
+                          let totalVal = newItems.reduce((sum, item) => sum + item.unitPrice, 0);
+                          const taxRate = pricing.taxPct !== undefined ? Number(pricing.taxPct) / 100 : 0.11;
+                          if (pricing.useTax) {
+                            totalVal = totalVal * (1 + taxRate);
+                          }
+
+                          updateDeal(selectedDeal.id, {
+                            quotationItems: newItems,
+                            value: totalVal,
+                            quotationDate: q.date || new Date().toISOString().split('T')[0],
+                            quotationExpiry: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                            quotationTerms: pricing.useTax ? `Termasuk PPN ${taxRate * 100}%` : 'Belum termasuk PPN'
+                          });
+
+                          alert(`Berhasil mengimpor penawaran resmi untuk ${q.client_name}! Nilai deal di-update menjadi Rp ${totalVal.toLocaleString('id-ID')}`);
+                        }}
+                        className="form-input"
+                        style={{ padding: '0.4rem', fontSize: '0.75rem', flex: 1, background: 'var(--bg-glass)', border: '1px solid var(--border-glass)', color: 'var(--text-primary)' }}
+                        defaultValue=""
+                      >
+                        <option value="" disabled>-- Pilih Penawaran RUNS Quote --</option>
+                        {(runsQuotations || []).map((q: any) => (
+                          <option key={q.id} value={q.id}>
+                            {q.client_name} - {q.reference_number || 'Tanpa Ref'} ({q.date || 'Tanpa Tanggal'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
                   {/* Current quote list */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', items: 'center' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>Quotation Items</span>
                       {selectedDeal.quotationItems.length > 0 && (
                         <button 
