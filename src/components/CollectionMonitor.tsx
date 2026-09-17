@@ -58,35 +58,82 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
     }
   };
 
-  // Compile all Billing & Collection milestones from all contracts
+  // Compile and consolidate Billing & Collection milestones from all contracts
   const milestones: VisualMilestone[] = [];
+
+  // Helper to sanitize stage name for pairing (e.g. "Down Payment Billing" -> "Down Payment")
+  const getBaseName = (name: string) => {
+    return name.replace(/\s+(Billing|Collection|Invoice)$/i, '').trim();
+  };
+
   contracts.forEach(c => {
     const p = projects.find(proj => proj.id === c.projectId);
     const cust = p ? companies.find(comp => comp.id === p.companyId) : null;
     
-    c.stages.forEach(st => {
-      if ((st.category === 'Billing' || st.category === 'Collection') && st.billingAmount && st.billingAmount > 0) {
-        milestones.push({
-          contractId: c.id,
-          contractTitle: c.title,
-          currency: c.currency,
-          stageId: st.id,
-          stageName: st.name,
-          category: st.category,
-          status: st.status,
-          dueDate: st.dueDate,
-          invoiceDate: st.invoiceDate || null,
-          billingAmount: st.billingAmount || 0,
-          invoiceNumber: st.invoiceNumber || null,
-          paymentReference: st.paymentReference || null,
-          projectCode: p ? p.code : 'N/A',
-          companyName: cust ? cust.name : 'N/A'
-        });
+    // Filter financial stages with positive billing amounts
+    const finStages = c.stages.filter(st => 
+      (st.category === 'Billing' || st.category === 'Collection') && 
+      st.billingAmount && 
+      st.billingAmount > 0
+    );
+
+    const processedIds = new Set<string>();
+
+    finStages.forEach(st => {
+      if (processedIds.has(st.id)) return;
+
+      const baseName = getBaseName(st.name);
+      
+      // Look for a paired stage (e.g. matching invoiceNumber or matching baseName + billingAmount)
+      const pair = finStages.find(other => 
+        other.id !== st.id && 
+        !processedIds.has(other.id) &&
+        (
+          (st.invoiceNumber && other.invoiceNumber && st.invoiceNumber === other.invoiceNumber) ||
+          (getBaseName(other.name) === baseName && Math.abs((st.billingAmount || 0) - (other.billingAmount || 0)) < 1)
+        )
+      );
+
+      const mergedInvoiceNumber = st.invoiceNumber || (pair?.invoiceNumber) || null;
+      const mergedInvoiceDate = st.invoiceDate || (pair?.invoiceDate) || null;
+      const mergedPaymentRef = st.paymentReference || (pair?.paymentReference) || null;
+      
+      let mergedStatus: ContractStageStatus = st.status;
+      let effectiveDueDate = st.dueDate;
+
+      if (pair) {
+        processedIds.add(pair.id);
+        if (pair.status === 'Done' || st.status === 'Done') {
+          mergedStatus = 'Done';
+        } else if (pair.status === 'Active' || st.status === 'Active') {
+          mergedStatus = 'Active';
+        }
+        // Prefer Collection stage due date for collection tracking
+        effectiveDueDate = st.category === 'Collection' ? st.dueDate : (pair.dueDate || st.dueDate);
       }
+
+      processedIds.add(st.id);
+
+      milestones.push({
+        contractId: c.id,
+        contractTitle: c.title,
+        currency: c.currency,
+        stageId: st.id,
+        stageName: baseName || st.name,
+        category: pair ? 'Collection' : st.category,
+        status: mergedStatus,
+        dueDate: effectiveDueDate,
+        invoiceDate: mergedInvoiceDate,
+        billingAmount: st.billingAmount || 0,
+        invoiceNumber: mergedInvoiceNumber,
+        paymentReference: mergedPaymentRef,
+        projectCode: p ? p.code : 'N/A',
+        companyName: cust ? cust.name : 'N/A'
+      });
     });
   });
 
-  // Filter milestones based on state
+  // Filter milestones based on user search and filters
   const filteredMilestones = milestones.filter(m => {
     const query = searchQuery.toLowerCase();
     const matchesSearch = 
@@ -103,55 +150,45 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
     return matchesSearch && matchesCompany && matchesCategory && matchesCurrency;
   });
 
-  // ── Column Classification ────────────────────────────────────────────────
-  //
-  // 1. PIPELINE: Billing OR Collection, status Pending/Active, dueDate >= today
-  //    (work that is scheduled but not yet due)
-  //
-  // 2. UNINVOICED: Billing stages (any status except Done/Skipped) that have
-  //    NO invoiceNumber yet — whether still pending or past their billing due
-  //    date. Includes "Billing Overdue" sub-group (dueDate < today, no invoice).
-  //
-  // 3. COLLECTION OVERDUE: Collection stages that are past due (dueDate < today)
-  //    and not yet Done/Skipped.
-  //
-  // 4. SETTLED & COLLECTED: Collection stages with status Done.
+  // ── Single-Card Progressive Column Classification ─────────────────────────
 
-  // Helper: days elapsed from a given date to today (positive = past)
+  // Helper: days elapsed from a date string to today
   const daysElapsed = (dateStr: string | null): number => {
     if (!dateStr) return 0;
     const diff = new Date(today).getTime() - new Date(dateStr).getTime();
     return Math.floor(diff / (1000 * 60 * 60 * 24));
   };
 
-  // 1. Uninvoiced: All Billing stages with NO invoice number issued yet (not Done/Skipped)
-  const uninvoicedMilestones = filteredMilestones.filter(m =>
-    m.category === 'Billing' &&
-    m.status !== 'Done' &&
-    m.status !== 'Skipped' &&
-    !m.invoiceNumber
+  // 1. SETTLED & COLLECTED: Payment received / confirmed done
+  const settledMilestones = filteredMilestones.filter(m =>
+    m.status === 'Done' || !!m.paymentReference
   );
 
-  // 2. Pipeline: Invoiced billing or Collection stages scheduled on track (not Done/Skipped, not past due)
-  const pipelineMilestones = filteredMilestones.filter(m =>
-    m.status !== 'Done' &&
-    m.status !== 'Skipped' &&
-    (!m.dueDate || m.dueDate >= today) &&
-    (m.category === 'Collection' || (m.category === 'Billing' && !!m.invoiceNumber))
-  );
-
-  // 3. Collection Overdue: Invoiced billing or Collection stages past due date (not Done/Skipped)
+  // 2. COLLECTION OVERDUE: Invoiced, payment not yet received, and past due date
   const collectionOverdueMilestones = filteredMilestones.filter(m =>
     m.status !== 'Done' &&
     m.status !== 'Skipped' &&
+    !m.paymentReference &&
+    !!m.invoiceNumber &&
     m.dueDate &&
-    m.dueDate < today &&
-    (m.category === 'Collection' || (m.category === 'Billing' && !!m.invoiceNumber))
+    m.dueDate < today
   );
 
-  // 4. Settled & Collected: Completed milestones
-  const settledMilestones = filteredMilestones.filter(m =>
-    m.status === 'Done'
+  // 3. UNINVOICED (Billing Overdue): Invoicing due date passed, but no invoice issued yet
+  const uninvoicedMilestones = filteredMilestones.filter(m =>
+    m.status !== 'Done' &&
+    m.status !== 'Skipped' &&
+    !m.invoiceNumber &&
+    m.dueDate &&
+    m.dueDate < today
+  );
+
+  // 4. PIPELINE: Scheduled in future or on-track active milestones (no overdue invoice or payment)
+  const pipelineMilestones = filteredMilestones.filter(m =>
+    m.status !== 'Done' &&
+    m.status !== 'Skipped' &&
+    !m.paymentReference &&
+    (!m.dueDate || m.dueDate >= today)
   );
 
   // Helper: sum IDR and USD amounts for a list of milestones
@@ -162,7 +199,6 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
   };
 
   const pipelineTotals = getTotals(pipelineMilestones);
-
   const uninvoicedTotals = getTotals(uninvoicedMilestones);
   const collectionOverdueTotals = getTotals(collectionOverdueMilestones);
   const settledTotals = getTotals(settledMilestones);
