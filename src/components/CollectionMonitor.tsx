@@ -124,14 +124,7 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
     return Math.floor(diff / (1000 * 60 * 60 * 24));
   };
 
-  // 1. Pipeline: upcoming / on-schedule — Billing OR Collection, not past due, not Done
-  const pipelineMilestones = filteredMilestones.filter(m =>
-    m.status !== 'Done' &&
-    m.status !== 'Skipped' &&
-    (!m.dueDate || m.dueDate >= today)
-  );
-
-  // 2. Uninvoiced: Billing stages with no invoice number yet (any date), not Done/Skipped
+  // 1. Uninvoiced: All Billing stages with NO invoice number issued yet (not Done/Skipped)
   const uninvoicedMilestones = filteredMilestones.filter(m =>
     m.category === 'Billing' &&
     m.status !== 'Done' &&
@@ -139,18 +132,25 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
     !m.invoiceNumber
   );
 
-  // 3. Collection Overdue: Collection past due date, not Done/Skipped
+  // 2. Pipeline: Invoiced billing or Collection stages scheduled on track (not Done/Skipped, not past due)
+  const pipelineMilestones = filteredMilestones.filter(m =>
+    m.status !== 'Done' &&
+    m.status !== 'Skipped' &&
+    (!m.dueDate || m.dueDate >= today) &&
+    (m.category === 'Collection' || (m.category === 'Billing' && !!m.invoiceNumber))
+  );
+
+  // 3. Collection Overdue: Invoiced billing or Collection stages past due date (not Done/Skipped)
   const collectionOverdueMilestones = filteredMilestones.filter(m =>
-    m.category === 'Collection' &&
     m.status !== 'Done' &&
     m.status !== 'Skipped' &&
     m.dueDate &&
-    m.dueDate < today
+    m.dueDate < today &&
+    (m.category === 'Collection' || (m.category === 'Billing' && !!m.invoiceNumber))
   );
 
-  // 4. Settled & Collected
+  // 4. Settled & Collected: Completed milestones
   const settledMilestones = filteredMilestones.filter(m =>
-    m.category === 'Collection' &&
     m.status === 'Done'
   );
 
