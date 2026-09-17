@@ -61,9 +61,16 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
   // Compile and consolidate Billing & Collection milestones from all contracts
   const milestones: VisualMilestone[] = [];
 
-  // Helper to sanitize stage name for pairing (e.g. "Down Payment Billing" -> "Down Payment")
-  const getBaseName = (name: string) => {
-    return name.replace(/\s+(Billing|Collection|Invoice)$/i, '').trim();
+  // Helper to normalize stage name for robust pairing (e.g. "Q1 Billing" & "Q1 Billing Invoice" -> "q1")
+  const normalizeName = (name: string) => {
+    return name.replace(/\s*(Billing|Collection|Invoice)+/gi, '').trim().toLowerCase();
+  };
+
+  const getCleanDisplayName = (name1: string, name2?: string) => {
+    if (!name2) return name1;
+    const norm1 = name1.replace(/\s*(Billing|Collection)+$/i, '').trim();
+    const norm2 = name2.replace(/\s*(Billing|Collection)+$/i, '').trim();
+    return norm1.length >= norm2.length ? norm1 : norm2;
   };
 
   contracts.forEach(c => {
@@ -82,15 +89,16 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
     finStages.forEach(st => {
       if (processedIds.has(st.id)) return;
 
-      const baseName = getBaseName(st.name);
+      const normStName = normalizeName(st.name);
       
-      // Look for a paired stage (e.g. matching invoiceNumber or matching baseName + billingAmount)
+      // Look for a paired stage (matching invoiceNumber OR matching normalized name + amount OR opposite category + matching amount)
       const pair = finStages.find(other => 
         other.id !== st.id && 
         !processedIds.has(other.id) &&
         (
           (st.invoiceNumber && other.invoiceNumber && st.invoiceNumber === other.invoiceNumber) ||
-          (getBaseName(other.name) === baseName && Math.abs((st.billingAmount || 0) - (other.billingAmount || 0)) < 1)
+          (normStName.length > 0 && normalizeName(other.name) === normStName && Math.abs((st.billingAmount || 0) - (other.billingAmount || 0)) < 1) ||
+          (st.category !== other.category && Math.abs((st.billingAmount || 0) - (other.billingAmount || 0)) < 1 && (normStName.includes(normalizeName(other.name)) || normalizeName(other.name).includes(normStName)))
         )
       );
 
@@ -103,12 +111,12 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
 
       if (pair) {
         processedIds.add(pair.id);
-        if (pair.status === 'Done' || st.status === 'Done') {
+        if (pair.status === 'Done' || st.status === 'Done' || !!mergedPaymentRef) {
           mergedStatus = 'Done';
         } else if (pair.status === 'Active' || st.status === 'Active') {
           mergedStatus = 'Active';
         }
-        // Prefer Collection stage due date for collection tracking
+        // Prefer Collection stage due date for payment collection tracking
         effectiveDueDate = st.category === 'Collection' ? st.dueDate : (pair.dueDate || st.dueDate);
       }
 
@@ -119,7 +127,7 @@ export const CollectionMonitor: React.FC<CollectionMonitorProps> = ({ onManageWo
         contractTitle: c.title,
         currency: c.currency,
         stageId: st.id,
-        stageName: baseName || st.name,
+        stageName: getCleanDisplayName(st.name, pair?.name),
         category: pair ? 'Collection' : st.category,
         status: mergedStatus,
         dueDate: effectiveDueDate,
